@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Build output
+dist/
+
+# Per-install backup (only created when setup.sh runs in a target repo;
+# never commit, since /fx-uninstall depends on it being a clean snapshot).
+_claude_backup/
+
+# Installer-generated manifest (commit it in target repos, but ignore it here
+# in the kit source — it would only be created if someone tested in-place).
+.fenix-manifest.json
+
+# Per-user Claude Code settings (machine-local; never commit)
+.claude/settings.local.json
+
+# Common deps
+node_modules/
+
+# Editor swap files
+*.swp
+*~
