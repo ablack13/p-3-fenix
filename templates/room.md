@@ -12,34 +12,24 @@ last_reviewed_date: <YYYY-MM-DD>
 
 ## Overview
 
-<2-4 sentences on what this subsystem does in this module>
+<Name> — <what this subsystem does in this module>; <key components>.
 
 ## Components
-
-### `<ComponentName>`
-
-<purpose, behavior>
 
 ```kotlin
 <verbatim public API: signatures only, no implementation>
 ```
 
-### `<NextComponent>`
-
-...
-
 ## Wiring
 
-<!-- How components connect: DI graph, registration order, lifecycle. -->
-
-<facts about wiring>
+- <binding/registration fact>
+- <lifecycle or order fact>
+- <`<file>:<line>` for non-obvious wiring>
 
 ## Gotchas
 
-<!-- Non-obvious things that broke before or could break a future contributor. -->
-
-- <fact>
-- <fact>
+- <fact from TODO/FIXME/HACK/NOTE/IMPORTANT/@Deprecated — cite `<file>:<line>`>
+- <or `(none)` if empty>
 
 ## See also
 

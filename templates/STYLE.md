@@ -32,24 +32,38 @@ Cross-wing references go in `hint_index_map.md`, not inline in wing READMEs.
 
 Any module with public surface (anything other modules import) MUST have at least `docs/README.md`. Internal-only utility modules can skip docs entirely.
 
-## Style — plain prose
+## Style — AI-optimized
+
+Docs are consumed by AI agents on tasks. Density and scannability over narrative prose.
 
 | Surface | Style |
 |---|---|
-| Descriptions, "why" sections | Plain prose, terse |
+| Overview | One line: `<Name> — <what>; <key components>` |
+| Components / Surface | Verbatim signatures only, no paraphrase |
+| Wiring | Bullets, one fact per line, cite `<file>:<line>` when non-obvious |
+| Gotchas | Bullets from `// TODO`, `// FIXME`, `// HACK`, `// NOTE:`, `// IMPORTANT:`, `@Deprecated`. Cite source. `(none)` if empty |
 | Section headers | Greppable English |
-| Code blocks | Verbatim |
-| Type signatures, error messages | Verbatim |
-| Gradle / Koin / SQLDelight / Ktor config | Verbatim |
 | Cross-ref links | Standard markdown |
 
 Rules:
 
-- Short sentences. State fact. Stop.
+- No narrative paragraphs in wing READMEs, rooms, or drawers.
 - No marketing tone. No hedging ("might", "could potentially").
 - No emojis.
 - Technical terms exact: `PracticeModule` stays `PracticeModule`.
-- Code, types, errors: never paraphrase.
+- Code, types, errors, config: never paraphrase.
+
+## File size — hard cap 70 lines
+
+No wing README, room, or drawer file exceeds 70 lines, counting frontmatter, blank lines, and code blocks.
+
+When a file would exceed the cap:
+
+1. **Wing READMEs** stay as thin indexes: one-line Overview + bulleted Rooms/Drawers list. Move detail into rooms/drawers.
+2. **Rooms** that grow past 70: promote each over-the-cap component into its own drawer.
+3. **Drawers** that still exceed 70: the component is too big. Flag in the doc's `See also` or surface to the developer — don't fragment further.
+
+Cap does not apply to `STYLE.md`, `info.md`, `hint_index_map.md`, `task-router.md`, or `reference/` docs.
 
 ## Frontmatter on rooms and drawers
 

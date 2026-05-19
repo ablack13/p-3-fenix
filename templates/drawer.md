@@ -7,17 +7,18 @@ last_reviewed_date: <YYYY-MM-DD>
 
 # <DrawerName>
 
-<one-line summary>
-
-## What it is
-
-<2-4 sentences on purpose and role>
+<one-line: what it is, key role>
 
 ## Surface
 
 ```kotlin
 <verbatim public API: signatures only>
 ```
+
+## Wiring
+
+- <where bound/registered/instantiated>
+- <`<file>:<line>` for non-obvious>
 
 ## Depends on
 
@@ -29,8 +30,8 @@ last_reviewed_date: <YYYY-MM-DD>
 
 ## Gotchas
 
-- <non-obvious fact>
-- <load order, lifecycle, threading concern, etc.>
+- <fact — cite `<file>:<line>`>
+- <or `(none)` if empty>
 
 ## See also
 
