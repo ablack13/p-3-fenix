@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# scripts/setup.sh — install P-3 (Fenix) 3.0.0 kit into the current repo
+# scripts/setup.sh — install P-3 (Fenix) 3.1.0 kit into the current repo
 #
 # Usage:
-#   ./scripts/setup.sh                          # uses ~/Downloads/p3-fenix-3.0.0.zip
+#   ./scripts/setup.sh                          # uses ~/Downloads/p3-fenix-3.1.0.zip
 #   ./scripts/setup.sh /path/to/kit.zip         # explicit zip path
 #
 # Idempotent: safe to re-run. Never overwrites existing files.
@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-FENIX_VERSION="3.0.0"
+FENIX_VERSION="3.1.0"
 KIT_NAME="p3-fenix-${FENIX_VERSION}"
 
 # --- args & defaults --------------------------------------------------------
@@ -51,7 +51,7 @@ section() { printf '\n%s%s%s\n' "$BOLD" "$1" "$RESET"; }
 
 # Manifest is a flat JSON file. We use simple shell-side appends because
 # we don't want a jq dependency. The format:
-# {"fenix_version":"3.0.0","installed_at":"...","actions":[...]}
+# {"fenix_version":"3.1.0","installed_at":"...","actions":[...]}
 # Action types: create, create-dir, modify, backup-move,
 #               rename-on-install (legacy, no longer emitted).
 

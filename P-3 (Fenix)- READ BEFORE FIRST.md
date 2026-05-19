@@ -1,6 +1,6 @@
 # P-3 (Fenix) — READ BEFORE FIRST
 
-P-3 (Fenix) v3.0.0 — comprehensive reference for the documentation system, file-based dev workflow, and task routing installed in this repo.
+P-3 (Fenix) v3.1.0 — comprehensive reference for the documentation system, file-based dev workflow, and task routing installed in this repo.
 
 This file is the front door. Read it once before doing anything else.
 
@@ -474,4 +474,4 @@ After a few cycles, the kit fades into the background. Auditors keep docs curren
 
 ---
 
-*Last updated for: 3.0.0*
+*Last updated for: 3.1.0*

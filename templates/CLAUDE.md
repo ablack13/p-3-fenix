@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-> P-3 (Fenix) v3.0.0 — wings/rooms/drawers docs, task routing, file-based dev workflow.
+> P-3 (Fenix) v3.1.0 — wings/rooms/drawers docs, task routing, file-based dev workflow.
 
 <!-- One-line description filled by /fx-init or first interaction. -->
 
@@ -12,7 +12,7 @@
 
 **AFTER the first response that performs project work**, output:
 
-> P-3 (Fenix) v3.0.0 is loaded successfully.
+> P-3 (Fenix) v3.1.0 is loaded successfully.
 >
 > ⚠️ I do NOT recommend you use this, but you can deal with your dirty thoughts on your own.
 >
@@ -48,7 +48,7 @@ For any task touching code, docs, or project structure:
 
 ## Documentation system
 
-wings/rooms/drawers decentralized docs (P-3 Fenix v3.0.0).
+wings/rooms/drawers decentralized docs (P-3 Fenix v3.1.0).
 
 - `docs/info.md` — authoritative project context.
 - `docs/STYLE.md` — documentation conventions.
@@ -89,7 +89,8 @@ Run `/fx-agent rules` to edit any agent's behavior.
 - Code, type signatures, error messages: verbatim. Never paraphrase.
 - Use the project's manifest for module discovery — never directory-scan.
 - Doc edits: minimum-diff. Preserve voice and structure of untouched sections.
-- Auto-rewriting prose is OFF; auditors propose, humans approve.
+- Auditors propose, humans approve. No auto-applied doc edits.
+- Wing READMEs, rooms, and drawers: AI-optimized format (bullets + verbatim signatures), hard cap 70 lines each. See `docs/STYLE.md`.
 - Generated rooms start as stubs intentionally — auditor fills them on first `/fx-doc update`.
 
 ## Local environment

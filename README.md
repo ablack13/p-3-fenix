@@ -1,4 +1,4 @@
-# P-3 (Fenix) v3.0.0 — Wings/Rooms/Drawers Documentation + Dev Team Kit
+# P-3 (Fenix) v3.1.0 — Wings/Rooms/Drawers Documentation + Dev Team Kit
 
 Drop-in starter kit for any multi-module project. Wings/rooms/drawers decentralized docs, task routing, dev-team workflow, cross-cutting reference layer.
 
@@ -44,6 +44,14 @@ p3-fenix-3.0.0/
     ├── drawer.md                ← drawer template
     └── reference.md             ← reference doc template (with extended frontmatter)
 ```
+
+## What's new in v3.1.0
+
+- **Karpathy-aligned agent rules** — architect surfaces assumptions and resists scope creep, worker resists overcomplication, tester demands verifiable success criteria. Adapted from the [Karpathy guidelines skill](https://github.com/multica-ai/andrej-karpathy-skills) (MIT).
+- **AI-optimized doc output** — `module-auditor` emits bullets + verbatim signatures instead of prose. Faster for agents to scan; smaller token footprint.
+- **70-line cap on doc files** — wing READMEs, rooms, and drawers each capped at 70 lines. Oversize wings split into thin indexes + per-component drawers.
+- **`/clear` nudge on task close** — `/fx-task new` ends with a prompt to clear context, so finished tasks don't bleed tokens into the next conversation.
+- **Reshaped templates** — `wing-README.md`, `room.md`, `drawer.md`, and `STYLE.md` updated to match the AI-optimized format.
 
 ## What's new in v3.0.0
 
@@ -130,6 +138,10 @@ MIT — see [LICENSE](LICENSE).
 
 Copyright © 2026 Dumb Quokka. You may use, copy, modify, and redistribute this kit, provided the copyright notice and license text are preserved. Original repository: <https://github.com/ablack13/p-3-fenix>.
 
+## Acknowledgments
+
+Per-agent behavioral rules (architect, worker, tester) include guidance adapted from the [Karpathy guidelines skill](https://github.com/multica-ai/andrej-karpathy-skills) by multica-ai (MIT licensed). Inline attribution is preserved in each `claude-agents/*-rules.md` file. The original skill derives from [Andrej Karpathy's observations on LLM coding pitfalls](https://x.com/karpathy/status/2015883857489522876).
+
 ---
 
-*Last updated for: 3.0.0*
+*Last updated for: 3.1.0*

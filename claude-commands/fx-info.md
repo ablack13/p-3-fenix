@@ -31,7 +31,7 @@ Read-only. Don't trigger an audit. Don't load full docs. Cheap status output.
 ## Output — fully initialized repo
 
 ```
-P-3 (Fenix) v3.0.0
+P-3 (Fenix) v3.1.0
 
 <summary line from docs/info.md>
 
@@ -58,7 +58,7 @@ Manifest:    .fenix-manifest.json (N actions recorded)
 ## Output — uninitialized repo
 
 ```
-P-3 (Fenix) v3.0.0
+P-3 (Fenix) v3.1.0
 
 ⚠ Repo not initialized. Run /fx-init to bootstrap wings/rooms/drawers structure.
 
@@ -77,7 +77,7 @@ Detected:
 ## Output — partially initialized
 
 ```
-P-3 (Fenix) v3.0.0
+P-3 (Fenix) v3.1.0
 
 ⚠ Partial setup. Run /fx-init to fill gaps.
 
@@ -96,7 +96,7 @@ Detected:
 
 ## Stub line — display rules
 
-If stub count > 0, always include the line "Stubs: K rooms/drawers still contain template placeholders" with a hint to run `/fx-doc update`. This makes #7 from the v3.0.0 observations visible — the developer sees there's work to fill them.
+If stub count > 0, always include the line "Stubs: K rooms/drawers still contain template placeholders" with a hint to run `/fx-doc update`. This makes the unfilled stubs visible — the developer sees there's work to fill them.
 
 If stub count is 0, the line says "Stubs: none — all docs have real content."
 
