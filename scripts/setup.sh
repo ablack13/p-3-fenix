@@ -53,6 +53,7 @@ section() { printf '\n%s%s%s\n' "$BOLD" "$1" "$RESET"; }
 # we don't want a jq dependency. The format:
 # {"fenix_version":"3.1.0","installed_at":"...","actions":[...]}
 # Action types: create, create-dir, modify, backup-move,
+#               upgrade-replace, upgrade-remove (added in 3.1.0),
 #               rename-on-install (legacy, no longer emitted).
 
 manifest_init() {
@@ -223,6 +224,145 @@ backup_existing_claude_artifacts
 section "Manifest"
 
 manifest_init
+
+# --- upgrade detection and dispatch ----------------------------------------
+#
+# If the manifest was already present (existing install), check its
+# fenix_version. If older than this kit, run the matching upgrade JSON from
+# scripts/upgrades/<from>-to-<to>.json before the normal copy flow.
+# If newer, refuse to downgrade.
+
+# Version compare: returns 0 (true) if $1 < $2 (semver-ish via sort -V).
+version_lt() {
+  [[ "$1" == "$2" ]] && return 1
+  local first
+  first="$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)"
+  [[ "$first" == "$1" ]]
+}
+
+# Map a repo-relative install path back to its source path inside the kit.
+kit_source_for() {
+  local rel="$1"
+  case "$rel" in
+    .claude/agents/*)      printf '%s/claude-agents/%s' "$KIT_DIR" "${rel#.claude/agents/}" ;;
+    .claude/commands/*)    printf '%s/claude-commands/%s' "$KIT_DIR" "${rel#.claude/commands/}" ;;
+    docs-meta/runbook.md)  printf '%s/runbook.md' "$KIT_DIR" ;;
+    docs-meta/templates/*) printf '%s/templates/%s' "$KIT_DIR" "${rel#docs-meta/templates/}" ;;
+    docs/*)                printf '%s/templates/%s' "$KIT_DIR" "${rel#docs/}" ;;
+    CLAUDE.md)             printf '%s/templates/CLAUDE.md' "$KIT_DIR" ;;
+    "P-3 (Fenix)- READ BEFORE FIRST.md") printf '%s/P-3 (Fenix)- READ BEFORE FIRST.md' "$KIT_DIR" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Replace an installed file, backing up the current copy under
+# _claude_backup/<subdir>/<rel-path>. Records action in manifest.
+replace_with_backup() {
+  local src="$1"
+  local rel="$2"
+  local backup_subdir="$3"
+  local dest="$REPO_ROOT/$rel"
+  local backup_dest="$CLAUDE_BACKUP_DIR/$backup_subdir/$rel"
+  if [[ -e "$dest" ]]; then
+    mkdir -p "$(dirname "$backup_dest")"
+    cp "$dest" "$backup_dest"
+    cp "$src" "$dest"
+    ok "$rel ${DIM}(replaced; backup at _claude_backup/$backup_subdir/$rel)${RESET}"
+    manifest_append "upgrade-replace" "$rel" "\"backup_path\": \"_claude_backup/$backup_subdir/$rel\""
+  else
+    mkdir -p "$(dirname "$dest")"
+    cp "$src" "$dest"
+    ok "$rel ${DIM}(installed — was missing)${RESET}"
+    manifest_append "create" "$rel"
+  fi
+}
+
+# Remove a file, moving it to backup first. Used for upgrade "remove" entries.
+remove_with_backup() {
+  local rel="$1"
+  local backup_subdir="$2"
+  local target="$REPO_ROOT/$rel"
+  if [[ ! -e "$target" ]]; then
+    return 0
+  fi
+  local backup_dest="$CLAUDE_BACKUP_DIR/$backup_subdir/$rel"
+  mkdir -p "$(dirname "$backup_dest")"
+  mv "$target" "$backup_dest"
+  ok "Removed $rel ${DIM}(backup at _claude_backup/$backup_subdir/$rel)${RESET}"
+  manifest_append "upgrade-remove" "$rel" "\"backup_path\": \"_claude_backup/$backup_subdir/$rel\""
+}
+
+apply_upgrade() {
+  local upgrade_file="$1"
+  local to_version
+  to_version="$(python3 -c "import json; print(json.load(open('$upgrade_file'))['to'])")"
+  local backup_subdir="${to_version}-upgrade"
+
+  mkdir -p "$CLAUDE_BACKUP_DIR/$backup_subdir"
+
+  # replace[]
+  local rel src
+  while IFS= read -r rel; do
+    [[ -z "$rel" ]] && continue
+    if ! src="$(kit_source_for "$rel")"; then
+      warn "Unknown path mapping for: $rel — skipping"
+      continue
+    fi
+    if [[ ! -f "$src" ]]; then
+      warn "Source missing in kit for $rel ($src) — skipping"
+      continue
+    fi
+    replace_with_backup "$src" "$rel" "$backup_subdir"
+  done < <(python3 -c "import json; print('\n'.join(json.load(open('$upgrade_file')).get('replace', [])))")
+
+  # remove[]
+  while IFS= read -r rel; do
+    [[ -z "$rel" ]] && continue
+    remove_with_backup "$rel" "$backup_subdir"
+  done < <(python3 -c "import json; print('\n'.join(json.load(open('$upgrade_file')).get('remove', [])))")
+
+  # create_if_missing[] — handled by the normal copy_if_missing flow that
+  # runs after this function, so we don't repeat it here. The normal flow
+  # will pick up any net-new files.
+
+  # Bump manifest version + record upgrade entry.
+  python3 - <<PYEOF
+import json
+with open('$MANIFEST_PATH') as f:
+    m = json.load(f)
+m['fenix_version'] = '$FENIX_VERSION'
+m.setdefault('upgrades', []).append({
+    'from': '$INSTALLED_VERSION',
+    'to': '$FENIX_VERSION',
+    'timestamp': '$TIMESTAMP',
+    'backup_dir': '_claude_backup/$backup_subdir/'
+})
+with open('$MANIFEST_PATH', 'w') as f:
+    json.dump(m, f, indent=2)
+PYEOF
+}
+
+INSTALLED_VERSION="$(python3 -c "
+import json
+try:
+    print(json.load(open('$MANIFEST_PATH')).get('fenix_version', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")"
+
+if [[ -n "$INSTALLED_VERSION" && "$INSTALLED_VERSION" != "$FENIX_VERSION" ]]; then
+  if version_lt "$INSTALLED_VERSION" "$FENIX_VERSION"; then
+    section "Upgrade detected: $INSTALLED_VERSION → $FENIX_VERSION"
+    UPGRADE_FILE="$KIT_DIR/scripts/upgrades/${INSTALLED_VERSION}-to-${FENIX_VERSION}.json"
+    if [[ ! -f "$UPGRADE_FILE" ]]; then
+      fail "No upgrade path from $INSTALLED_VERSION to $FENIX_VERSION (missing ${UPGRADE_FILE#$KIT_DIR/})"
+    fi
+    apply_upgrade "$UPGRADE_FILE"
+    ok "Upgrade applied. Pre-change copies are in _claude_backup/${FENIX_VERSION}-upgrade/"
+  else
+    fail "Installed version ($INSTALLED_VERSION) is newer than this kit ($FENIX_VERSION). Refusing to downgrade."
+  fi
+fi
 
 # --- directory creation ----------------------------------------------------
 

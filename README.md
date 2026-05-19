@@ -63,21 +63,36 @@ p3-fenix-3.0.0/
 
 ## Install
 
-> **Run all three commands from the root directory of your project** — the same directory where you launch Claude Code (`claude`). The installer writes into `$(pwd)`, so the working directory matters.
+> **Run from the root directory of your project** — the same directory where you launch Claude Code (`claude`). The installer writes into `$(pwd)`.
+
+### One-command install (recommended)
 
 ```bash
-curl -LO https://github.com/ablack13/p-3-fenix/releases/download/3.0.0/p3-fenix-3.0.0.zip
-unzip p3-fenix-3.0.0.zip
-./p3-fenix-3.0.0/scripts/setup.sh
+curl -fsSL https://raw.githubusercontent.com/ablack13/p-3-fenix/main/scripts/install-online.sh | bash
 ```
 
-After install, clean up the unzipped distribution (the installer prints the exact `rm` command at the end of its output):
+This downloads the latest release zip into a temp dir, extracts it, runs the installer against your repo root, and cleans up after itself.
+
+Pin a specific version:
 
 ```bash
-rm -rf p3-fenix-3.0.0 p3-fenix-3.0.0.zip
+FENIX_VERSION=3.1.0 bash -c "$(curl -fsSL https://raw.githubusercontent.com/ablack13/p-3-fenix/main/scripts/install-online.sh)"
 ```
 
-Then open Claude Code in this project and run:
+Want to inspect the installer before running? Read it at <https://github.com/ablack13/p-3-fenix/blob/main/scripts/install-online.sh>.
+
+### Manual install (download → unzip → run)
+
+```bash
+curl -LO https://github.com/ablack13/p-3-fenix/releases/download/3.1.0/p3-fenix-3.1.0.zip
+unzip p3-fenix-3.1.0.zip
+./p3-fenix-3.1.0/scripts/setup.sh
+rm -rf p3-fenix-3.1.0 p3-fenix-3.1.0.zip
+```
+
+### After install
+
+Open Claude Code in this project and run:
 
 ```
 /fx-init
@@ -91,9 +106,22 @@ It scaffolds wings, drafts `info.md`, populates `CLAUDE.md` placeholders, genera
 - If your project already has a `CLAUDE.md` or `.claude/` folder, it moves them aside into `_claude_backup/` (with an `IGNORE_THIS_FOLDER.md` disclaimer so Claude leaves the backup alone).
 - Records every action in `.fenix-manifest.json` so `/fx-uninstall` can reverse the install cleanly.
 
+### Upgrading an existing install
+
+Re-running the installer (one-command or manual) on a repo that already has an older Fenix install triggers the upgrade path:
+
+- The installer reads `.fenix-manifest.json` to detect your current version.
+- It loads `scripts/upgrades/<from>-to-<to>.json` for the transition (e.g. `3.0.0-to-3.1.0.json`).
+- Files marked `replace` are overwritten with the new version. The previous copy is moved to `_claude_backup/<new-version>-upgrade/<path>` so you can diff or recover.
+- Files marked `preserve` (your `CLAUDE.md`, `docs/info.md`, `docs/task-router.md`, `docs/hint_index_map.md`) are left untouched.
+- New files added in the target version (e.g. `docs/DISCLAIMER.md` in 3.1.0) are installed only if missing.
+- Files removed in the target version are moved to the same backup folder.
+
+If no upgrade path exists between your installed version and the kit's version, the installer stops with an error rather than silently merging.
+
 ### Uninstall
 
-`/fx-uninstall` walks the manifest, removes everything Fenix installed, restores `_claude_backup/` contents to their original locations, and deletes the manifest.
+`/fx-uninstall` walks the manifest, removes everything Fenix installed, restores `_claude_backup/` contents to their original locations, and deletes the manifest. Uninstall does **not** revert an upgrade to the previous version — it removes Fenix entirely. To restore pre-upgrade copies of replaced files, look under `_claude_backup/<version>-upgrade/`.
 
 ### Prerequisites
 

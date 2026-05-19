@@ -1,0 +1,33 @@
+{
+  "from": "3.0.0",
+  "to": "3.1.0",
+  "summary": "Karpathy-aligned agent rules, AI-optimized module-auditor output and templates, 70-line cap on doc files, /clear nudge on task close, editable bootstrap ritual extracted to docs/DISCLAIMER.md.",
+  "replace": [
+    ".claude/agents/architect-rules.md",
+    ".claude/agents/worker-rules.md",
+    ".claude/agents/tester-rules.md",
+    ".claude/agents/module-auditor-rules.md",
+    ".claude/commands/fx-task.md",
+    ".claude/commands/fx-info.md",
+    ".claude/commands/fx-init.md",
+    "docs/STYLE.md",
+    "docs-meta/runbook.md",
+    "docs-meta/templates/wing-README.md",
+    "docs-meta/templates/room.md",
+    "docs-meta/templates/drawer.md",
+    "P-3 (Fenix)- READ BEFORE FIRST.md"
+  ],
+  "preserve": [
+    "CLAUDE.md",
+    "docs/info.md",
+    "docs/task-router.md",
+    "docs/hint_index_map.md"
+  ],
+  "create_if_missing": [
+    "docs/DISCLAIMER.md"
+  ],
+  "remove": [],
+  "notes": [
+    "CLAUDE.md is preserved because it carries per-project customizations (project name, Stack, Local environment). The 3.1.0 template updated the Session bootstrap and Conventions sections — review docs/DISCLAIMER.md and consider syncing those sections manually from the kit's templates/CLAUDE.md."
+  ]
+}

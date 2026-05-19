@@ -27,6 +27,19 @@ All three share the same three-phase shape: Discover/Audit → Plan → Execute.
 
 ---
 
+## Upgrades
+
+Re-running the installer (one-command via `install-online.sh` or manual via `scripts/setup.sh`) detects an existing install from `.fenix-manifest.json` and applies the matching `scripts/upgrades/<from>-to-<to>.json`.
+
+- **replace**: kit-owned files overwritten with the target version. Pre-change copy goes to `_claude_backup/<to>-upgrade/<path>` and is recorded as `upgrade-replace` in the manifest.
+- **preserve**: user content (`CLAUDE.md`, `docs/info.md`, `docs/task-router.md`, `docs/hint_index_map.md`) left untouched.
+- **create_if_missing**: new files added in the target version, installed only if absent.
+- **remove**: files dropped in the target version, moved to the same backup folder and recorded as `upgrade-remove`.
+
+If no upgrade JSON exists for the transition, the installer stops rather than silently merging. Downgrades are refused. `/fx-uninstall` removes Fenix entirely and does not revert upgrades — manually copy from `_claude_backup/<version>-upgrade/` if you need pre-upgrade content.
+
+---
+
 ## Topology (wings/rooms/drawers, decentralized)
 
 ```
