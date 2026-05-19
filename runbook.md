@@ -1,4 +1,4 @@
-# Docs Runbook — P-3 (Fenix) 3.0.0
+# Docs Runbook — P-3 (Fenix) 3.1.0
 
 Codename: **Fenix**
 
@@ -27,6 +27,25 @@ All three share the same three-phase shape: Discover/Audit → Plan → Execute.
 
 ---
 
+## Upgrades
+
+Three entry points, all converging on the same upgrade logic:
+
+- `/fx-init upgrade [version]` — from inside Claude Code. Reads the manifest, resolves the latest release tag (or accepts a pinned version), shows a plan, and invokes `install-online.sh` on approval. The simplest path on 3.1.0+ installs.
+- `curl -fsSL …/install-online.sh | bash` — from a shell.
+- `./scripts/setup.sh` from a manually-extracted kit zip — equivalent.
+
+All three detect an existing install from `.fenix-manifest.json` and apply the matching `scripts/upgrades/<from>-to-<to>.json`.
+
+- **replace**: kit-owned files overwritten with the target version. Pre-change copy goes to `_claude_backup/<to>-upgrade/<path>` and is recorded as `upgrade-replace` in the manifest.
+- **preserve**: user content (`CLAUDE.md`, `docs/info.md`, `docs/task-router.md`, `docs/hint_index_map.md`) left untouched.
+- **create_if_missing**: new files added in the target version, installed only if absent.
+- **remove**: files dropped in the target version, moved to the same backup folder and recorded as `upgrade-remove`.
+
+If no upgrade JSON exists for the transition, the installer stops rather than silently merging. Downgrades are refused. `/fx-uninstall` removes Fenix entirely and does not revert upgrades — manually copy from `_claude_backup/<version>-upgrade/` if you need pre-upgrade content.
+
+---
+
 ## Topology (wings/rooms/drawers, decentralized)
 
 ```
@@ -52,19 +71,22 @@ docs/                            ← thin shell at repo root
 
 ---
 
-## Style
+## Style — AI-optimized
 
-Plain prose. No caveman style. Aim for short, decisive sentences without marketing tone or hedging.
+Docs are consumed by AI agents on tasks. Density and scannability over narrative prose.
 
 | Surface | Style |
 |---|---|
-| Descriptions, "why" sections | Plain prose, terse |
+| Overview | One line: `<Name> — <what>; <key components>` |
+| Components / Surface | Verbatim signatures only, no paraphrase |
+| Wiring | Bullets, one fact per line, cite `<file>:<line>` when non-obvious |
+| Gotchas | Bullets from `// TODO`, `// FIXME`, `// HACK`, `// NOTE:`, `// IMPORTANT:`, `@Deprecated`. Cite source. `(none)` if empty |
 | Section headers | Greppable English |
-| Code blocks, type signatures, errors | Verbatim |
-| Gradle / Koin / SQLDelight / Ktor config | Verbatim |
 | Cross-ref links | Standard markdown |
 
-No emojis. No drive-by rewrites of untouched sections. Minimum-diff edits.
+No narrative paragraphs in wing READMEs, rooms, or drawers. No emojis. No drive-by rewrites. Minimum-diff edits.
+
+**File size — hard cap 70 lines** per wing README, room, or drawer (counting frontmatter and code blocks). Over cap → wing README becomes a thin index; per-component drawers absorb detail. See `templates/STYLE.md` for the full split policy.
 
 ---
 
@@ -187,7 +209,7 @@ Read-only. Doesn't trigger an audit, doesn't load full docs.
 Output:
 
 ```
-P-3 (Fenix) v3.0.0
+P-3 (Fenix) v3.1.0
 
 <summary line from docs/info.md if present>
 
@@ -205,7 +227,7 @@ Last audit:  <date from latest file in docs/_history/>
 If repo is uninitialized:
 
 ```
-P-3 (Fenix) v3.0.0
+P-3 (Fenix) v3.1.0
 
 ⚠ Repo not initialized. Run /init to bootstrap wings/rooms/drawers structure.
 
@@ -281,8 +303,8 @@ Output a finalized plan in `docs/_pending/plan-<YYYYMMDD-HHMM>.md` reflecting hu
    7. Mark todo done. Print one-line summary: `<module>: <what changed>`.
 4. For stale-only docs (no PR-driven change, just freshness):
    1. Read source diff since `last_reviewed_commit`.
-   2. If prose still accurate → re-stamp only (bump commit + date).
-   3. If prose needs update → edit, then re-stamp.
+   2. If facts still accurate → re-stamp only (bump commit + date).
+   3. If facts need update → edit, then re-stamp.
 5. After all done:
    - Re-validate `hint_index_map.md`: every link resolves, every wing listed, no orphan rooms or drawers.
    - Update `Last index review` hash.
@@ -398,26 +420,24 @@ last_reviewed_date: <YYYY-MM-DD>
 
 ## Overview
 
-<2-4 sentences on what this subsystem does in this module>
+<Name> — <what this subsystem does in this module>; <key components>.
 
 ## Components
 
-### `<ComponentName>`
-
-<purpose, behavior>
-
 \`\`\`kotlin
-<verbatim public API: signatures only>
+<verbatim public API: signatures only, no implementation>
 \`\`\`
 
 ## Wiring
 
-<how components connect — DI graph, registration, lifecycle>
+- <binding/registration fact>
+- <lifecycle or order fact>
+- <`<file>:<line>` for non-obvious wiring>
 
 ## Gotchas
 
-- <fact>
-- <fact>
+- <fact from TODO/FIXME/HACK/NOTE/IMPORTANT/@Deprecated — cite `<file>:<line>`>
+- <or `(none)` if empty>
 
 ## See also
 
@@ -436,17 +456,18 @@ last_reviewed_date: <YYYY-MM-DD>
 
 # <DrawerName>
 
-<one-line summary>
-
-## What it is
-
-<2-4 sentences>
+<one-line: what it is, key role>
 
 ## Surface
 
 \`\`\`kotlin
 <verbatim public API: signatures only>
 \`\`\`
+
+## Wiring
+
+- <where bound/registered/instantiated>
+- <`<file>:<line>` for non-obvious>
 
 ## Depends on
 
@@ -458,7 +479,8 @@ last_reviewed_date: <YYYY-MM-DD>
 
 ## Gotchas
 
-- <fact>
+- <fact — cite `<file>:<line>`>
+- <or `(none)` if empty>
 
 ## See also
 
@@ -519,4 +541,4 @@ End of `/info`:
 
 ---
 
-*Last updated for: 3.0.0*
+*Last updated for: 3.1.0*

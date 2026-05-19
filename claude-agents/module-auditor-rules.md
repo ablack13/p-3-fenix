@@ -14,49 +14,34 @@ A doc IS a stub if any of these are present:
 
 If a doc is a stub, prioritize fill BEFORE checking staleness.
 
-## Stub-fill content generation
+## Stub-fill format — AI-optimized
 
-For each stub, you generate real prose by reading actual source. Section by section:
+Output is consumed by AI agents on tasks. Density and scannability over prose. No narrative paragraphs.
 
-### Overview section (2-4 sentences)
+### Overview
+One line: `<Name> — <what it does>; <key components>`.
+Example: `PracticeModule — Koin DI for practice screen; binds PracticeViewModel, PracticeDataStore, PracticeOperator.`
 
-Name what the subsystem does in *this specific module*, with actual class names. Don't write generic descriptions like "DI for the practice module" — write "The PracticeModule registers Koin dependencies for the practice screen, including PracticeViewModel, PracticeDataStore, and PracticeOperator."
-
-### Components section
-
-List actual public types from source, with real signatures verbatim:
+### Components
+Verbatim public signatures from source. One block per type. No paraphrasing, no simplification.
 
 ```kotlin
-class PracticeModule : Module() {
-    override fun loadModule(builder: KoinDefinitionBuilder)
-}
-
 interface PracticeDataStore {
     fun observeCards(): Flow<List<Card>>
     suspend fun submitAnswer(cardId: CardId, answer: Answer): Result<Unit>
 }
 ```
 
-Don't simplify. Don't paraphrase. Verbatim.
+### Wiring
+Bullets only. One fact per line. Cite `<file>:<line>` for non-obvious wiring.
+- `PracticeViewModel` → `factoryOf`, scoped to `PracticeScreen`
+- `PracticeDataStore` → `singleOf`, depends on `Database`
+- Migration runs on first `observeCards()` call (`PracticeDataStore.kt:42`)
 
-### Wiring section
-
-Describe how components are connected based on actual code:
-- For DI rooms: which classes are bound to which interfaces, in what scope, with what dependencies.
-- For persistence rooms: how the DAO is constructed, when migrations run.
-- For network rooms: how the HTTP client is initialized, what plugins are registered.
-
-Don't speculate. If the wiring is non-obvious from a quick read, say "see `<file>:<line>` for full wiring."
-
-### Gotchas section
-
-Extract from:
-- `// TODO`, `// FIXME`, `// HACK` comments.
-- `@Deprecated` annotations.
-- `// NOTE:` or `// IMPORTANT:` comments.
-- Non-obvious patterns (e.g., a manual lifecycle handoff, an order-dependent registration).
-
-If none found, write `(none currently identified)` rather than fabricating.
+### Gotchas
+Bullets from `// TODO`, `// FIXME`, `// HACK`, `// NOTE:`, `// IMPORTANT:`, `@Deprecated`, and non-obvious patterns (manual lifecycle, order-dependent registration). Cite source. If none: `(none)`.
+- `// TODO PracticeOperator.kt:88` — retry policy not implemented
+- `@Deprecated PracticeLegacyAdapter` — removal slated 3.2.0
 
 ## Project-specific signal detection
 
@@ -104,6 +89,16 @@ A class warrants a drawer when:
 - It's a large coordinator, state machine, or screen factory with non-obvious lifecycle.
 
 Don't suggest drawers for every public class. Be selective. The proposal lists them as suggestions for the developer to approve.
+
+## Output size — hard cap 70 lines per file
+
+No proposed doc file exceeds 70 lines, counting frontmatter, blank lines, and code blocks. Hard limit.
+
+When a wing README would exceed 70 lines after fill:
+
+1. Keep the wing README as a minimal index: one-line Overview + bulleted list of drawers with one-line summaries each.
+2. Promote each over-the-cap component to its own drawer using the four-section format above.
+3. Each drawer is itself bound by the 70-line cap. If a drawer would still exceed 70, flag in `Risks` — don't split further. The component is too big; that's a source-side issue, not a docs-side one.
 
 ## Pre-existing rot
 

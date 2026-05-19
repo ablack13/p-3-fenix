@@ -1,11 +1,11 @@
 # Wing: <module>
 
-<one-line summary of the module>
+<one-line: what this module does; key components>
 
 ## Public surface
 
-- `<TypeName>` — <purpose>
-- `<TypeName>` — <purpose>
+- `<TypeName>` — <one-line purpose>
+- `<TypeName>` — <one-line purpose>
 
 ## Rooms
 
@@ -13,16 +13,15 @@
 - [Persistence](rooms/persistence.md) — <one line>
 - [Network](rooms/network.md) — <one line>
 
+## Drawers
+
+- [<ClassName>](drawers/<ClassName>.md) — <one line>
+
 ## Load order
 
-<!-- Where does this module sit relative to others? Koin module load order, init dependencies, etc. -->
-
-<ordering facts, e.g. "after CoreModule, before UiModule. Depends on shared session state.">
+- <fact, e.g. "after CoreModule, before UiModule">
+- <fact, e.g. "depends on shared session state">
 
 ## Cross-wing deps
 
 See `docs/hint_index_map.md` § <module>.
-
-## Notes
-
-<!-- Wing-level facts that don't belong in a specific room. Optional section. -->

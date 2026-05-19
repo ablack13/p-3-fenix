@@ -1,4 +1,4 @@
-# P-3 (Fenix) v3.0.0 — Wings/Rooms/Drawers Documentation + Dev Team Kit
+# P-3 (Fenix) v3.1.0 — Wings/Rooms/Drawers Documentation + Dev Team Kit
 
 Drop-in starter kit for any multi-module project. Wings/rooms/drawers decentralized docs, task routing, dev-team workflow, cross-cutting reference layer.
 
@@ -45,6 +45,14 @@ p3-fenix-3.0.0/
     └── reference.md             ← reference doc template (with extended frontmatter)
 ```
 
+## What's new in v3.1.0
+
+- **Karpathy-aligned agent rules** — architect surfaces assumptions and resists scope creep, worker resists overcomplication, tester demands verifiable success criteria. Adapted from the [Karpathy guidelines skill](https://github.com/multica-ai/andrej-karpathy-skills) (MIT).
+- **AI-optimized doc output** — `module-auditor` emits bullets + verbatim signatures instead of prose. Faster for agents to scan; smaller token footprint.
+- **70-line cap on doc files** — wing READMEs, rooms, and drawers each capped at 70 lines. Oversize wings split into thin indexes + per-component drawers.
+- **`/clear` nudge on task close** — `/fx-task new` ends with a prompt to clear context, so finished tasks don't bleed tokens into the next conversation.
+- **Reshaped templates** — `wing-README.md`, `room.md`, `drawer.md`, and `STYLE.md` updated to match the AI-optimized format.
+
 ## What's new in v3.0.0
 
 - **All commands prefixed with `fenix-`** — no collision with built-ins, consistent namespace.
@@ -55,21 +63,36 @@ p3-fenix-3.0.0/
 
 ## Install
 
-> **Run all three commands from the root directory of your project** — the same directory where you launch Claude Code (`claude`). The installer writes into `$(pwd)`, so the working directory matters.
+> **Run from the root directory of your project** — the same directory where you launch Claude Code (`claude`). The installer writes into `$(pwd)`.
+
+### One-command install (recommended)
 
 ```bash
-curl -LO https://github.com/ablack13/p-3-fenix/releases/download/3.0.0/p3-fenix-3.0.0.zip
-unzip p3-fenix-3.0.0.zip
-./p3-fenix-3.0.0/scripts/setup.sh
+curl -fsSL https://raw.githubusercontent.com/ablack13/p-3-fenix/main/scripts/install-online.sh | bash
 ```
 
-After install, clean up the unzipped distribution (the installer prints the exact `rm` command at the end of its output):
+This downloads the latest release zip into a temp dir, extracts it, runs the installer against your repo root, and cleans up after itself.
+
+Pin a specific version:
 
 ```bash
-rm -rf p3-fenix-3.0.0 p3-fenix-3.0.0.zip
+FENIX_VERSION=3.1.0 bash -c "$(curl -fsSL https://raw.githubusercontent.com/ablack13/p-3-fenix/main/scripts/install-online.sh)"
 ```
 
-Then open Claude Code in this project and run:
+Want to inspect the installer before running? Read it at <https://github.com/ablack13/p-3-fenix/blob/main/scripts/install-online.sh>.
+
+### Manual install (download → unzip → run)
+
+```bash
+curl -LO https://github.com/ablack13/p-3-fenix/releases/download/3.1.0/p3-fenix-3.1.0.zip
+unzip p3-fenix-3.1.0.zip
+./p3-fenix-3.1.0/scripts/setup.sh
+rm -rf p3-fenix-3.1.0 p3-fenix-3.1.0.zip
+```
+
+### After install
+
+Open Claude Code in this project and run:
 
 ```
 /fx-init
@@ -83,9 +106,32 @@ It scaffolds wings, drafts `info.md`, populates `CLAUDE.md` placeholders, genera
 - If your project already has a `CLAUDE.md` or `.claude/` folder, it moves them aside into `_claude_backup/` (with an `IGNORE_THIS_FOLDER.md` disclaimer so Claude leaves the backup alone).
 - Records every action in `.fenix-manifest.json` so `/fx-uninstall` can reverse the install cleanly.
 
+### Upgrading an existing install
+
+Two ways:
+
+**From inside Claude Code (recommended for 3.1.0+):**
+
+```
+/fx-init upgrade
+```
+
+Reads `.fenix-manifest.json`, queries GitHub for the latest release, shows a plan, and runs the installer on approval. Pin a target version with `/fx-init upgrade 3.2.0`.
+
+**From the shell** — re-run the installer (one-command or manual) and it auto-detects the upgrade:
+
+- The installer reads `.fenix-manifest.json` to detect your current version.
+- It loads `scripts/upgrades/<from>-to-<to>.json` for the transition (e.g. `3.0.0-to-3.1.0.json`).
+- Files marked `replace` are overwritten with the new version. The previous copy is moved to `_claude_backup/<new-version>-upgrade/<path>` so you can diff or recover.
+- Files marked `preserve` (your `CLAUDE.md`, `docs/info.md`, `docs/task-router.md`, `docs/hint_index_map.md`) are left untouched.
+- New files added in the target version (e.g. `docs/DISCLAIMER.md` in 3.1.0) are installed only if missing.
+- Files removed in the target version are moved to the same backup folder.
+
+If no upgrade path exists between your installed version and the kit's version, the installer stops with an error rather than silently merging.
+
 ### Uninstall
 
-`/fx-uninstall` walks the manifest, removes everything Fenix installed, restores `_claude_backup/` contents to their original locations, and deletes the manifest.
+`/fx-uninstall` walks the manifest, removes everything Fenix installed, restores `_claude_backup/` contents to their original locations, and deletes the manifest. Uninstall does **not** revert an upgrade to the previous version — it removes Fenix entirely. To restore pre-upgrade copies of replaced files, look under `_claude_backup/<version>-upgrade/`.
 
 ### Prerequisites
 
@@ -130,6 +176,10 @@ MIT — see [LICENSE](LICENSE).
 
 Copyright © 2026 Dumb Quokka. You may use, copy, modify, and redistribute this kit, provided the copyright notice and license text are preserved. Original repository: <https://github.com/ablack13/p-3-fenix>.
 
+## Acknowledgments
+
+Per-agent behavioral rules (architect, worker, tester) include guidance adapted from the [Karpathy guidelines skill](https://github.com/multica-ai/andrej-karpathy-skills) by multica-ai (MIT licensed). Inline attribution is preserved in each `claude-agents/*-rules.md` file. The original skill derives from [Andrej Karpathy's observations on LLM coding pitfalls](https://x.com/karpathy/status/2015883857489522876).
+
 ---
 
-*Last updated for: 3.0.0*
+*Last updated for: 3.1.0*

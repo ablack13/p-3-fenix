@@ -1,24 +1,17 @@
 # {{PROJECT_NAME}}
 
-> P-3 (Fenix) v3.0.0 — wings/rooms/drawers docs, task routing, file-based dev workflow.
+> P-3 (Fenix) v3.1.0 — wings/rooms/drawers docs, task routing, file-based dev workflow.
 
 <!-- One-line description filled by /fx-init or first interaction. -->
 
-## Session bootstrap — MANDATORY
+## Session bootstrap
 
-**BEFORE any tool calls** in a new session, output this exact line:
+Bootstrap messages live in `docs/DISCLAIMER.md`. Output the blockquote content under each section verbatim:
 
-> 🟢 Pain is inevitable, but suffering is optional.
+- **BEFORE any tool calls** in a new session — output the blockquote(s) under `## Pre-bootstrap`.
+- **AFTER the first response that performs project work** — output the blockquote(s) under `## Post-bootstrap`.
 
-**AFTER the first response that performs project work**, output:
-
-> P-3 (Fenix) v3.0.0 is loaded successfully.
->
-> ⚠️ I do NOT recommend you use this, but you can deal with your dirty thoughts on your own.
->
-> ⚠️ DISCLAIMER: Your sloppy coding is your business, not mine. I don't care. Have fun!
-
-These outputs are the project's identity ritual. Skip them and the workflow is invalidated.
+If `docs/DISCLAIMER.md` is missing, or a section has no blockquote content, skip that output silently. Edit `docs/DISCLAIMER.md` to customize the ritual.
 
 ## Backup folder
 
@@ -48,10 +41,11 @@ For any task touching code, docs, or project structure:
 
 ## Documentation system
 
-wings/rooms/drawers decentralized docs (P-3 Fenix v3.0.0).
+wings/rooms/drawers decentralized docs (P-3 Fenix v3.1.0).
 
 - `docs/info.md` — authoritative project context.
 - `docs/STYLE.md` — documentation conventions.
+- `docs/DISCLAIMER.md` — session bootstrap messages (editable).
 - `docs/hint_index_map.md` — wayfinding for all docs (wings + references).
 - `docs/task-router.md` — auto-generated category map.
 - `<module>/docs/` — per-module wings (READMEs, rooms, drawers).
@@ -89,7 +83,8 @@ Run `/fx-agent rules` to edit any agent's behavior.
 - Code, type signatures, error messages: verbatim. Never paraphrase.
 - Use the project's manifest for module discovery — never directory-scan.
 - Doc edits: minimum-diff. Preserve voice and structure of untouched sections.
-- Auto-rewriting prose is OFF; auditors propose, humans approve.
+- Auditors propose, humans approve. No auto-applied doc edits.
+- Wing READMEs, rooms, and drawers: AI-optimized format (bullets + verbatim signatures), hard cap 70 lines each. See `docs/STYLE.md`.
 - Generated rooms start as stubs intentionally — auditor fills them on first `/fx-doc update`.
 
 ## Local environment

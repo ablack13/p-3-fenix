@@ -62,6 +62,16 @@ Old quarantine flow that renamed `CLAUDE.md` → `CLAUDE.md.old` with a disclaim
 - Delete the `.old` file.
 This branch is kept for backward compatibility only; new installs (3.0.0+) use `backup-move`.
 
+#### action: `upgrade-replace` *(3.1.0+)*
+A kit-owned file was overwritten during an upgrade. The pre-upgrade copy was moved to `backup_path` (under `_claude_backup/<version>-upgrade/`). For uninstall:
+- Mark the live file for removal (same as `create`).
+- Leave the backup copy in place. Do **not** auto-restore — uninstall removes Fenix entirely; users wanting pre-upgrade state should restore manually from `_claude_backup/<version>-upgrade/` before running uninstall, or copy out specific files after.
+
+#### action: `upgrade-remove` *(3.1.0+)*
+A file removed during an upgrade. The file was moved to `backup_path`. For uninstall:
+- Nothing to remove (already gone from live tree).
+- Leave the backup in place. Same manual-recovery note as `upgrade-replace`.
+
 #### action: `stub-fill`
 Auditor wrote real prose into a stub. The stub-filled doc is preserved (it has user value). Don't mark for removal — those are scaffold files Fenix created.
 
