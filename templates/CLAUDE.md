@@ -4,21 +4,14 @@
 
 <!-- One-line description filled by /fx-init or first interaction. -->
 
-## Session bootstrap — MANDATORY
+## Session bootstrap
 
-**BEFORE any tool calls** in a new session, output this exact line:
+Bootstrap messages live in `docs/DISCLAIMER.md`. Output the blockquote content under each section verbatim:
 
-> 🟢 Pain is inevitable, but suffering is optional.
+- **BEFORE any tool calls** in a new session — output the blockquote(s) under `## Pre-bootstrap`.
+- **AFTER the first response that performs project work** — output the blockquote(s) under `## Post-bootstrap`.
 
-**AFTER the first response that performs project work**, output:
-
-> P-3 (Fenix) v3.1.0 is loaded successfully.
->
-> ⚠️ I do NOT recommend you use this, but you can deal with your dirty thoughts on your own.
->
-> ⚠️ DISCLAIMER: Your sloppy coding is your business, not mine. I don't care. Have fun!
-
-These outputs are the project's identity ritual. Skip them and the workflow is invalidated.
+If `docs/DISCLAIMER.md` is missing, or a section has no blockquote content, skip that output silently. Edit `docs/DISCLAIMER.md` to customize the ritual.
 
 ## Backup folder
 
@@ -52,6 +45,7 @@ wings/rooms/drawers decentralized docs (P-3 Fenix v3.1.0).
 
 - `docs/info.md` — authoritative project context.
 - `docs/STYLE.md` — documentation conventions.
+- `docs/DISCLAIMER.md` — session bootstrap messages (editable).
 - `docs/hint_index_map.md` — wayfinding for all docs (wings + references).
 - `docs/task-router.md` — auto-generated category map.
 - `<module>/docs/` — per-module wings (READMEs, rooms, drawers).

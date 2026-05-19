@@ -41,6 +41,7 @@ CLAUDE.md:   populated
 Index:       docs/hint_index_map.md
 Setup notes: docs/info.md
 Style guide: docs/STYLE.md
+Disclaimer:  docs/DISCLAIMER.md (bootstrap messages, editable)
 Task router: docs/task-router.md (N categories)
 Audit log:   docs/_history/
 

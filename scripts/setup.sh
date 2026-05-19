@@ -290,6 +290,7 @@ section "Installing shared docs"
 copy_if_missing "$KIT_DIR/templates/STYLE.md"        "$REPO_ROOT/docs/STYLE.md"
 copy_if_missing "$KIT_DIR/templates/task-router.md"  "$REPO_ROOT/docs/task-router.md"
 copy_if_missing "$KIT_DIR/templates/info.md"         "$REPO_ROOT/docs/info.md"
+copy_if_missing "$KIT_DIR/templates/DISCLAIMER.md"   "$REPO_ROOT/docs/DISCLAIMER.md"
 
 # --- CLAUDE.md -------------------------------------------------------------
 #
