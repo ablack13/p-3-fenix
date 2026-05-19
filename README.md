@@ -108,7 +108,17 @@ It scaffolds wings, drafts `info.md`, populates `CLAUDE.md` placeholders, genera
 
 ### Upgrading an existing install
 
-Re-running the installer (one-command or manual) on a repo that already has an older Fenix install triggers the upgrade path:
+Two ways:
+
+**From inside Claude Code (recommended for 3.1.0+):**
+
+```
+/fx-init upgrade
+```
+
+Reads `.fenix-manifest.json`, queries GitHub for the latest release, shows a plan, and runs the installer on approval. Pin a target version with `/fx-init upgrade 3.2.0`.
+
+**From the shell** — re-run the installer (one-command or manual) and it auto-detects the upgrade:
 
 - The installer reads `.fenix-manifest.json` to detect your current version.
 - It loads `scripts/upgrades/<from>-to-<to>.json` for the transition (e.g. `3.0.0-to-3.1.0.json`).

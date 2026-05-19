@@ -29,7 +29,13 @@ All three share the same three-phase shape: Discover/Audit → Plan → Execute.
 
 ## Upgrades
 
-Re-running the installer (one-command via `install-online.sh` or manual via `scripts/setup.sh`) detects an existing install from `.fenix-manifest.json` and applies the matching `scripts/upgrades/<from>-to-<to>.json`.
+Three entry points, all converging on the same upgrade logic:
+
+- `/fx-init upgrade [version]` — from inside Claude Code. Reads the manifest, resolves the latest release tag (or accepts a pinned version), shows a plan, and invokes `install-online.sh` on approval. The simplest path on 3.1.0+ installs.
+- `curl -fsSL …/install-online.sh | bash` — from a shell.
+- `./scripts/setup.sh` from a manually-extracted kit zip — equivalent.
+
+All three detect an existing install from `.fenix-manifest.json` and apply the matching `scripts/upgrades/<from>-to-<to>.json`.
 
 - **replace**: kit-owned files overwritten with the target version. Pre-change copy goes to `_claude_backup/<to>-upgrade/<path>` and is recorded as `upgrade-replace` in the manifest.
 - **preserve**: user content (`CLAUDE.md`, `docs/info.md`, `docs/task-router.md`, `docs/hint_index_map.md`) left untouched.
