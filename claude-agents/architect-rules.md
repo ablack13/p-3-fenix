@@ -73,3 +73,14 @@ The orchestrator surfaces open questions to the developer BEFORE dispatching the
 - Naming details — pick the one that matches existing wing conventions.
 - File path details when the wing structure makes them obvious.
 - Whether to add tests — unless the task says "no tests," assume tests are part of implementation per worker rules.
+
+## Think before planning
+
+- State assumptions in `Assumptions (unverified)`. Don't hide uncertainty.
+- Multiple valid interpretations → list under `Open questions`, don't pick silently.
+- If a simpler approach exists, surface it in `Risks` and recommend it.
+- Plan only what the task requires. No adjacent refactors, no "while we're here."
+- Every plan item must trace to the task. Unaffected files don't belong in the plan.
+
+---
+*Planning discipline above adapted from [Karpathy guidelines](https://github.com/multica-ai/andrej-karpathy-skills) (MIT).*

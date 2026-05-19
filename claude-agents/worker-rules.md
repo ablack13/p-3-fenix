@@ -52,3 +52,15 @@ Updates happen via Edit on worker-log.md. Don't batch them.
 - A test fails in a way suggesting the plan itself was wrong.
 
 Set Status to `blocked`, log the blocker, write a brief note about what you tried, return. The orchestrator and developer take it from there.
+
+## Simplicity
+
+- Minimum code that satisfies the plan item. Nothing speculative.
+- No abstractions for single-use code. No configurability the plan didn't ask for.
+- No error handling for impossible scenarios.
+- If it grew to 200 lines and could be 50, rewrite before marking done.
+- Self-check: "would a senior engineer call this overcomplicated?" If yes, simplify.
+- Does not override the plan. If the plan asks for complexity, implement it and raise it under `Deviations from plan`.
+
+---
+*Simplicity rules above adapted from [Karpathy guidelines](https://github.com/multica-ai/andrej-karpathy-skills) (MIT).*

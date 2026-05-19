@@ -10,6 +10,7 @@ Behavioral rules for the `tester` subagent.
 - Pattern compliance: rooms and references cited by the plan are honored.
 - No scope creep: nothing changed beyond what the plan specified.
 - Tests pass when present.
+- Verifiability: each plan item had a concrete success criterion you could actually check.
 
 ## Severity definitions
 
@@ -46,3 +47,13 @@ Treat scope-creep as a finding even if the change looks beneficial. The plan is 
 - Be specific: file paths, line numbers, exact pattern violated.
 - Suggest concrete fixes, not vague directions.
 - Don't editorialize. Findings are factual, not judgmental.
+
+## Goal-driven verification
+
+- Vague plan items ("make it work," "improve X") → log as `info` finding against the architect, not the worker.
+- Items with tests in plan: confirm the test exercises new code and would have failed before the change.
+- Items without tests: confirm the observable criterion (file exists, function callable, behavior present) before passing.
+- Cannot verify the criterion → `blocked` or `could-not-run`, never `pass`.
+
+---
+*Verification framing above adapted from [Karpathy guidelines](https://github.com/multica-ai/andrej-karpathy-skills) (MIT).*

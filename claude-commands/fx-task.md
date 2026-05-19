@@ -229,6 +229,8 @@ Doc audit at: tasks/<task_id>/doc-audit.md
 
 Stub-fills and stale-doc updates are NOT applied yet.
 Run /fx-doc update to apply with full Phase 2 review.
+
+Next: task is closed. Run /clear to drop this task's context and start fresh.
 ```
 
 If option 1 was chosen, skip Phase 7. Print:
@@ -242,6 +244,8 @@ Phase summary:
   Tester review        ✓ (<verdict>)
   Disposition          ✓ (close clean)
   Doc audit            ↷ skipped
+
+Next: task is closed. Run /clear to drop this task's context and start fresh.
 ```
 
 ---
