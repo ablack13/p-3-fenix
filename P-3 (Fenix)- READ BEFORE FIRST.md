@@ -1,6 +1,6 @@
 # P-3 (Fenix) — READ BEFORE FIRST
 
-P-3 (Fenix) v3.1.0 — comprehensive reference for the documentation system, file-based dev workflow, and task routing installed in this repo.
+P-3 (Fenix) v3.2.0 — comprehensive reference for the documentation system, file-based dev workflow, and task routing installed in this repo.
 
 This file is the front door. Read it once before doing anything else.
 
@@ -47,6 +47,7 @@ your-project/
 │       ├── outcome.md        ← Phase 5 result
 │       └── doc-audit.md      ← Phase 7 output (optional)
 ├── docs-meta/                ← runbook + templates (operational reference)
+│   └── .fenix-cache.json     ← derived /fx-doc cache (frontmatter index; rebuilt on demand)
 └── modules/<each>/docs/      ← per-module wings (auto-scaffolded by /fx-init)
 ```
 
@@ -80,32 +81,35 @@ Reports: bootstrap state, module documentation coverage, **stub count** (rooms s
 
 ### `/fx-doc audit [base..head]`
 
-Phase 1 audit only. Read-only. Default range: `main..HEAD`.
+Phase 1 audit only. Read-only. Default staleness upper bound: `HEAD`.
 
-Spawns:
-- `module-auditor` per module — **detects stubs AND finds stale docs in one pass**.
-- `freshness-scanner` for global staleness check (skip with `--skip-freshness`).
+**Delta-gated (3.2.0):** the orchestrator first loads/builds `docs-meta/.fenix-cache.json` — a cheap frontmatter index — then runs a **per-doc** `git log <doc.last_reviewed_commit>..HEAD -- <doc.documents:>` to decide *which modules to audit*. It spawns a `module-auditor` only for modules whose documented sources moved since the doc was last reviewed, or that still hold stubs. Unchanged modules get no subagent and are reported "up to date (cache)." Staleness gating is intrinsic and cheap (git log only) — there is no separate freshness pass during audit; `/fx-doc freshness` is the standalone report.
+
+Spawns (for in-scope modules only):
+- `module-auditor` — confirms the flagged stubs and classifies staleness from `git diff <last_reviewed_commit>..HEAD -- <documents:>` (the delta, not the whole module).
 - `reference-linker` for any unlinked files in `reference/`.
 
 Saves report and per-module proposals to `docs/_pending/audit-<timestamp>/`. Stops for review.
 
+Flags: `--all` (ignore the gate, audit everything), `--only <module>`, `--rebuild-cache`, `--stubs-only` (gate on stubs, skip the staleness git-log), `--suggest-drawers` (let auditors walk `src/` for new drawers — off by default).
+
 ### `/fx-doc update [base..head]`
 
-Full sweep — Phase 1 audit + Phase 2 plan + Phase 3 update.
+Full sweep — Phase 1 audit (same delta gate) + Phase 2 plan + Phase 3 update.
 
 Phase 3 actions:
-- **Fills stubs** — applies auditor-proposed real content to rooms/drawers. Frontmatter `documents:` updated to actual source paths.
+- **Fills stubs** — applies auditor-proposed real content to rooms/drawers. Frontmatter `documents:` updated to actual source paths; cache `is_stub` flipped to false.
 - Updates stale docs per audit findings.
-- Re-stamps stale docs that don't need prose changes.
+- Re-stamps stale docs that don't need prose changes; bumps cache `last_reviewed_commit`.
 - Refreshes `task-router.md` if room set changed.
 - Auto-links new reference files using `reference-linker` proposals.
 - Archives audit + plan reports to `docs/_history/`.
 
-The workhorse command. Run after `/fx-init` to fill stubs, then again after multi-module changes.
+The workhorse command. Run after `/fx-init` to fill stubs, then again after multi-module changes. Use `/fx-doc update --only <module>` for the targeted, expensive single-module refresh.
 
 ### `/fx-doc freshness`
 
-Standalone staleness scan. Spawns `freshness-scanner` only.
+The routine, **code-free** "what's stale" check — git log only, no source reads. Run this often; reach for `update --only <module>` when you actually want a doc refreshed. Spawns `freshness-scanner` only (cache-backed when present).
 
 ### `/fx-task <description>`
 
@@ -184,12 +188,13 @@ Every agent has a sibling `<name>-rules.md` file for editable behavior. Run `/fx
 
 #### `module-auditor`
 - **Tools:** Read, Edit, Write, Grep, Glob, Bash.
+- **Spawned only for in-scope modules** by `/fx-doc`'s delta gate, and handed the exact `stub_docs` / `stale_docs` to act on — it does not re-scan the whole wing.
 - **Writes to:** proposal files in `docs/_pending/audit-<timestamp>/<module>.md` or `tasks/<task_id>/doc-audit-proposals/<module>.md`. Never edits actual docs.
 - **Two jobs:**
-  1. Detect template stubs in rooms/drawers.
-  2. Generate real content for stubs by reading actual source code.
+  1. Fill the flagged stubs — generate real content by reading actual source code.
+  2. Classify staleness for the flagged docs from `git diff <last_reviewed_commit>..HEAD -- <documents:>` (the delta, not the whole `src/`).
 - Picks project-specific patterns from `build.gradle.kts` (Koin vs Hilt, SQLDelight vs Room, etc.) — doesn't default to generic terminology.
-- Also classifies staleness from git diffs.
+- Walks `src/` for new drawer candidates only when `suggest_drawers` is set.
 
 #### `module-discoverer`
 - **Tools:** Read, Grep, Glob, Bash. Read-only.
@@ -198,7 +203,7 @@ Every agent has a sibling `<name>-rules.md` file for editable behavior. Run `/fx
 
 #### `freshness-scanner`
 - **Tools:** Read, Glob, Bash. Read-only.
-- **Used by:** `/fx-doc freshness`, global pass in `/fx-doc audit`.
+- **Used by:** `/fx-doc freshness` (standalone report). The `/fx-doc audit`/`update` gate runs the same per-doc `git log` check inline in the orchestrator. Cache-backed when a fresh `cache_path` is passed.
 - Walks rooms, drawers, references, index. Reports staleness with severity hints.
 
 #### `reference-linker`
@@ -305,8 +310,9 @@ Silent for normal tasks. Use `/fx-task <description>` to see the routing decisio
 `/fx-init` scaffolds rooms with template placeholders. This is intentional — init creates structure; the auditor fills content.
 
 When you run `/fx-doc audit`:
-- The `module-auditor` walks every module's docs.
-- For each room/drawer with placeholder text, it reads the module's source code.
+- The orchestrator runs the delta gate (cache + a per-doc `git log`) and spawns a `module-auditor` only for **in-scope** modules — those whose documented sources changed or that still hold stubs. Unchanged modules get no subagent.
+- Each auditor is handed the exact stub docs to fill; it does not walk unchanged wings.
+- For each stub, it reads the module's source code.
 - It identifies project-specific patterns from build files (Koin vs Hilt, etc.).
 - It generates real prose, real component lists with verbatim signatures, real wiring descriptions, real gotchas extracted from code.
 - It proposes the filled content in a per-module proposal file.
@@ -456,6 +462,7 @@ Reviews everything that will be removed, warns about user content, restores `_cl
 | `.claude/agents/*-rules.md` | Per-agent behavioral rules | Yes (the main edit point) |
 | `docs-meta/runbook.md` | Full operational reference | Rarely |
 | `docs-meta/templates/*` | File shape references | No |
+| `docs-meta/.fenix-cache.json` | Derived /fx-doc frontmatter cache | No (auto-managed; rebuild with `--rebuild-cache`) |
 
 ---
 
@@ -463,7 +470,7 @@ Reviews everything that will be removed, warns about user content, restores `_cl
 
 If this is your first time:
 
-1. Run `unzip p3-fenix-3.0.0.zip && ./p3-fenix-3.0.0/scripts/setup.sh` if you haven't.
+1. Run `unzip p3-fenix-3.2.0.zip && ./p3-fenix-3.2.0/scripts/setup.sh` if you haven't.
 2. Run `/fx-init` — scaffolds structure (with stubs).
 3. Run `/fx-doc audit` — auditor proposes content for the stubs.
 4. Run `/fx-doc update` — review and apply the proposals.
@@ -474,4 +481,4 @@ After a few cycles, the kit fades into the background. Auditors keep docs curren
 
 ---
 
-*Last updated for: 3.1.0*
+*Last updated for: 3.2.0*

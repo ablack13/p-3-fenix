@@ -16,7 +16,7 @@ Both blockquote content and the surrounding blank lines are preserved.
 
 <!-- Output verbatim AFTER the first response that performs project work. -->
 
-> P-3 (Fenix) v3.1.0 is loaded successfully.
+> P-3 (Fenix) v3.2.0 is loaded successfully.
 >
 > ⚠️ I do NOT recommend you use this, but you can deal with your dirty thoughts on your own.
 >

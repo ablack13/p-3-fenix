@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-> P-3 (Fenix) v3.1.0 — wings/rooms/drawers docs, task routing, file-based dev workflow.
+> P-3 (Fenix) v3.2.0 — wings/rooms/drawers docs, task routing, file-based dev workflow.
 
 <!-- One-line description filled by /fx-init or first interaction. -->
 
@@ -41,7 +41,7 @@ For any task touching code, docs, or project structure:
 
 ## Documentation system
 
-wings/rooms/drawers decentralized docs (P-3 Fenix v3.1.0).
+wings/rooms/drawers decentralized docs (P-3 Fenix v3.2.0).
 
 - `docs/info.md` — authoritative project context.
 - `docs/STYLE.md` — documentation conventions.

@@ -1,4 +1,4 @@
-# Docs Runbook — P-3 (Fenix) 3.1.0
+# Docs Runbook — P-3 (Fenix) 3.2.0
 
 Codename: **Fenix**
 
@@ -63,6 +63,8 @@ docs/                            ← thin shell at repo root
 ├── STYLE.md                     ← conventions
 ├── _pending/                    ← audit reports awaiting approval
 └── _history/                    ← archived audit reports
+
+docs-meta/.fenix-cache.json      ← derived frontmatter index; the delta gate's input
 ```
 
 **Module path prefix** is **not hardcoded**. Modules may live at `modules/<name>/`, repo root, or grouped (`shared/`, `composeApp/`, `iosApp/`). The runbook discovers actual paths from `settings.gradle.kts` `include(":...")` entries.
@@ -209,7 +211,7 @@ Read-only. Doesn't trigger an audit, doesn't load full docs.
 Output:
 
 ```
-P-3 (Fenix) v3.1.0
+P-3 (Fenix) v3.2.0
 
 <summary line from docs/info.md if present>
 
@@ -227,7 +229,7 @@ Last audit:  <date from latest file in docs/_history/>
 If repo is uninitialized:
 
 ```
-P-3 (Fenix) v3.1.0
+P-3 (Fenix) v3.2.0
 
 ⚠ Repo not initialized. Run /init to bootstrap wings/rooms/drawers structure.
 
@@ -248,16 +250,16 @@ The summary line comes from the first blockquote in `info.md` (right under the H
 
 This is what runs when you paste this runbook into Claude Code without a slash command.
 
-### Phase 1 — Audit (read-only)
+### Phase 1 — Audit (read-only, delta-gated)
 
-Engage plan mode (`shift+tab`). **No edits this phase.**
+Engage plan mode (`shift+tab`). **No edits this phase** (except building the cache if absent).
 
 1. Read `INFO_FILE`. Note any conventions or environment quirks. They override inferences from code.
 2. Read `INDEX_FILE` end to end. Build mental map of every wing, room, drawer, xref.
-3. Run `git diff <BASE_REF>..<HEAD_REF> --stat`. Group by module.
-4. Run `git diff <BASE_REF>..<HEAD_REF> -- <module-path>` for each touched module.
-5. **PR-driven delta:** for modules with > ~500 changed lines, spawn the **`module-auditor`** subagent in parallel via `Task` with `subagent_type=module-auditor`. Pass `{ module_name, module_path, BASE_REF, HEAD_REF }`. Smaller modules: handle inline. See `.claude/agents/module-auditor.md` for the subagent's contract.
-6. **Global staleness scan** (skip if `--skip-freshness` flag in user's invocation): spawn the **`freshness-scanner`** subagent via `Task` with `subagent_type=freshness-scanner`. It walks every `docs/hint_index_map.md` and per-module `<module>/docs/` for frontmatter checks. See `.claude/agents/freshness-scanner.md`.
+3. **Load or build the cache** `docs-meta/.fenix-cache.json` — a frontmatter index (`documents:`, `last_reviewed_commit`, `is_stub`) per doc. If absent or `--rebuild-cache`, build it inline: glob rooms/drawers/wing-READMEs, read frontmatter only + grep for stub markers. This is the only doc-touching work the orchestrator does. Manifest-record the file the first time it's created.
+4. **Per-doc delta gate.** For each cached doc, run `git log <doc.last_reviewed_commit>..HEAD --oneline -- <doc.documents:>` — the doc is **delta-stale** if that returns any commit (sources moved since *it* was last reviewed; gate per-doc, not a global `main..HEAD` range). A module is **in scope** if it owns a delta-stale doc OR a doc with `is_stub: true`. Escape hatches: `--all` (audit everything), `--only <module>`, `--rebuild-cache`, `--stubs-only` (gate on stubs, skip the staleness git-log).
+5. **Spawn an auditor only for in-scope modules.** For each, spawn the **`module-auditor`** subagent in parallel via `Task` with `subagent_type=module-auditor`. Pass `{ module_name, module_path, BASE_REF, HEAD_REF, stub_docs, stale_docs, suggest_drawers }`. The auditor reads only the handed docs and, for staleness, the `git diff <last_reviewed_commit>..HEAD -- <documents:>` — not the whole `src/`. Modules gated out get no auditor; report them "up to date (cache)." See `.claude/agents/module-auditor.md` for the subagent's contract.
+6. **Index integrity** is checked when synthesizing the report (xref breaks, orphan rooms/drawers). The per-doc staleness gate in step 4 already covers source-level freshness, so no separate scan runs here; for a standalone read-only staleness report use `/fx-doc freshness` (which spawns the cache-backed **`freshness-scanner`**). See `.claude/agents/freshness-scanner.md`.
 7. Each `module-auditor` invocation returns:
    ```
    ### Module: <name>
@@ -273,7 +275,7 @@ Engage plan mode (`shift+tab`). **No edits this phase.**
 8. Main agent synthesizes:
    - **Top:** summary table (one row per module — name, severity, room count, drawer count, xref breaks).
    - **Middle:** per-module detail blocks.
-   - **Stale-docs section:** docs flagged by freshness scan, separate from PR-driven changes.
+   - **Stale-docs section:** docs the per-doc gate flagged delta-stale (sources moved since each doc's `last_reviewed_commit`), with the auditor's severity classification.
    - **Bottom:** full `hint_index_map.md` change list (additions, removals, xref edits).
 9. Save report to `docs/_pending/audit-<YYYYMMDD-HHMM>.md`.
 10. Print: `Audit complete. <N> modules affected, <K> stale docs flagged. Review report at <path>. Reply 'approved' to proceed to Phase 3, or send corrections.`
@@ -294,20 +296,21 @@ Output a finalized plan in `docs/_pending/plan-<YYYYMMDD-HHMM>.md` reflecting hu
 1. `TodoWrite`: one todo per affected module + one per stale doc.
 2. Process **serially**. Parallel writes race on `hint_index_map.md`.
 3. For each module:
-   1. Re-read wing docs fresh. Audit told you *what* changed — not current state.
-   2. Apply edits to rooms and drawers per plan.
-   3. Code, types, errors verbatim.
-   4. Add new drawers if plan justified them. Use drawer template.
-   5. Update frontmatter: bump `last_reviewed_commit` to `git rev-parse --short HEAD`, `last_reviewed_date` to today.
-   6. Update `hint_index_map.md`: wing's section, plus any cross-wing xrefs.
+   1. Apply edits to the affected rooms/drawers per the auditor proposal (built from the diff — you don't need to re-read the whole wing).
+   2. Code, types, errors verbatim.
+   3. Add new drawers if plan justified them. Use drawer template.
+   4. Update frontmatter: bump `last_reviewed_commit` to `git rev-parse --short HEAD`, `last_reviewed_date` to today.
+   5. Update `hint_index_map.md`: wing's section, plus any cross-wing xrefs.
+   6. Update the cache entry for each touched doc (`is_stub: false` after a fill; `last_reviewed_commit` to HEAD).
    7. Mark todo done. Print one-line summary: `<module>: <what changed>`.
-4. For stale-only docs (no PR-driven change, just freshness):
+4. For docs the gate flagged delta-stale that need no prose change (re-stamp candidates):
    1. Read source diff since `last_reviewed_commit`.
-   2. If facts still accurate → re-stamp only (bump commit + date).
+   2. If facts still accurate → re-stamp only (bump commit + date + cache).
    3. If facts need update → edit, then re-stamp.
 5. After all done:
    - Re-validate `hint_index_map.md`: every link resolves, every wing listed, no orphan rooms or drawers.
    - Update `Last index review` hash.
+   - Refresh the cache's `head_commit` + `generated_at` to the post-update HEAD.
    - Move audit + plan reports from `docs/_pending/` to `docs/_history/`.
    - Print final summary table.
 
@@ -511,7 +514,7 @@ Halt and ask human if:
 - `hint_index_map.md` not found at `INDEX_FILE` path. Suggest `/init`.
 - Wing references a room or drawer file that does not exist. Pre-existing breakage → human call.
 - Audit reveals > 5 pre-existing rot items. Suggests separate cleanup pass.
-- More than ~30 stale docs flagged in global scan. Suggests dedicated freshness sweep instead of folding into PR sweep.
+- More than ~30 docs flagged delta-stale by the per-doc gate. Suggest a dedicated freshness sweep rather than folding all of them into one audit.
 
 ---
 
@@ -541,4 +544,4 @@ End of `/info`:
 
 ---
 
-*Last updated for: 3.1.0*
+*Last updated for: 3.2.0*

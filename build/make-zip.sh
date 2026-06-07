@@ -28,6 +28,8 @@ rsync -a \
   --exclude='dist/' \
   --exclude='build/' \
   --exclude='_claude_backup/' \
+  --exclude='next_version/' \
+  --exclude='.claude/' \
   --exclude='.idea/' \
   --exclude='.DS_Store' \
   --exclude='.git/' \

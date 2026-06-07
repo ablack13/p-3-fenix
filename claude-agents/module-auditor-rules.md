@@ -4,15 +4,29 @@ Behavioral rules for the `module-auditor` subagent.
 
 ---
 
-## Stub detection — strong indicators
+## Scope discipline (3.2.0)
 
-A doc IS a stub if any of these are present:
+You are spawned by the delta gate in `/fx-doc` only for in-scope modules, and handed
+`stub_docs` + `stale_docs`. Work those lists; don't re-read the wing to rediscover
+them. For staleness, read the **diff** (`git diff <last_reviewed_commit>..HEAD --
+<documents:>`), not the whole `src/`. Walk `src/` for new drawers **only** when
+`suggest_drawers` is true. Read full source only when filling a stub or reading the
+specific changed files behind a `rewrite`.
+
+(Fallback: if invoked with no lists — directly or by an older caller — read the wing
+and do the full self-scan as the pre-3.2.0 auditor did.)
+
+## Stub confirmation — strong indicators
+
+The orchestrator's cache already flagged `stub_docs`. Confirm before filling — a doc
+IS a stub if any of these are present:
 
 - Placeholder text in angle brackets: `<2-4 sentences on...>`, `<facts>`, `<placeholder>`, `<ComponentName>`, `<purpose, behavior>`, `<one-line summary — fill in>`, `<TypeName>`, `<verbatim public API: signatures only>`.
 - Frontmatter `documents:` is empty (`[]`) or points at a folder rather than specific files.
 - Wing README has all sections present but each section is a single placeholder line.
 
-If a doc is a stub, prioritize fill BEFORE checking staleness.
+If a flagged doc already has real prose + specific `documents:`, it's a cache mismatch
+— note it under `Pre-existing rot`, skip the fill, never overwrite real content.
 
 ## Stub-fill format — AI-optimized
 
@@ -81,7 +95,10 @@ When ambiguous, choose the more conservative (higher severity).
 
 ## Drawer suggestions
 
-A class warrants a drawer when:
+Only run the drawer walk when `suggest_drawers` is true. Otherwise skip it — the
+unconditional `src/` walk is the expensive scan that 3.2.0 moved behind a flag.
+
+When enabled, a class warrants a drawer when:
 
 - It's a DI module/component declaration.
 - It's a Database class (SQLDelight Database, Room Database, etc.).
@@ -117,4 +134,5 @@ Audit one wing at a time. But when this wing's changes affect another wing's doc
 - DO NOT fabricate source files in `documents:`. Only list verified paths.
 - DO NOT default to common framework names without checking the build file. The Hilt-vs-Koin error came from this.
 - DO NOT propose stub fills based on the stub itself — read the source.
-- DO NOT skip the stub check. Stubs are the priority.
+- DO NOT re-read the whole wing or whole `src/` to rediscover work already scoped in `stub_docs`/`stale_docs` (fallback path excepted).
+- DO NOT run the drawer walk unless `suggest_drawers` is true.
