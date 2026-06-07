@@ -137,7 +137,7 @@ If missing, create it. Otherwise, append entries from this run.
 Format:
 ```json
 {
-  "fenix_version": "3.1.0",
+  "fenix_version": "3.2.0",
   "installed_at": "<timestamp>",
   "actions": [
     {"action": "create", "path": "CLAUDE.md", "phase": "install"},

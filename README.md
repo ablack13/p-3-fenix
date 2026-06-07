@@ -1,30 +1,34 @@
-# P-3 (Fenix) v3.1.0 — Wings/Rooms/Drawers Documentation + Dev Team Kit
+# P-3 (Fenix) v3.2.0 — Wings/Rooms/Drawers Documentation + Dev Team Kit
 
 Drop-in starter kit for any multi-module project. Wings/rooms/drawers decentralized docs, task routing, dev-team workflow, cross-cutting reference layer.
 
 ## Contents
 
 ```
-p3-fenix-3.0.0/
+p3-fenix-3.2.0/
 ├── README.md                    ← this file
 ├── runbook.md                   ← main runbook (full operational details)
-├── plan.md                      ← design document this kit is built from
+├── LICENSE
+├── P-3 (Fenix)- READ BEFORE FIRST.md  ← full reference for commands/agents/workflows
 ├── scripts/
-│   └── setup.sh                 ← installer
+│   ├── setup.sh                 ← installer (manifest-driven, idempotent)
+│   ├── install-online.sh        ← one-command online installer
+│   └── upgrades/                ← pairwise <from>-to-<to>.json upgrade configs
 ├── claude-commands/
-│   ├── fenix-init.md            ← /fx-init
-│   ├── fenix-info.md            ← /fx-info
-│   ├── fenix-doc.md             ← /fx-doc audit | update | freshness
-│   ├── fenix-task.md            ← /fx-task <description> | new <description>
-│   └── fenix-agent.md           ← /fx-agent rules | list
+│   ├── fx-init.md               ← /fx-init
+│   ├── fx-info.md               ← /fx-info
+│   ├── fx-doc.md                ← /fx-doc audit | update | freshness
+│   ├── fx-task.md               ← /fx-task <description> | new <description>
+│   ├── fx-agent.md              ← /fx-agent rules | list
+│   └── fx-uninstall.md          ← /fx-uninstall (manifest-driven removal)
 ├── claude-agents/
-│   ├── architect.md             ← designs implementation plans (read-only)
+│   ├── architect.md             ← designs implementation plans (read-only on code)
 │   ├── architect-rules.md       ← architect behavioral rules
-│   ├── worker.md                ← executes plans (only writer in the kit)
+│   ├── worker.md                ← executes plans (only writer of project code)
 │   ├── worker-rules.md          ← worker behavioral rules
-│   ├── tester.md                ← reviews worker output (read-only)
+│   ├── tester.md                ← reviews worker output (read-only on code)
 │   ├── tester-rules.md          ← tester behavioral rules
-│   ├── module-auditor.md        ← per-module change impact (used by /fx-doc audit)
+│   ├── module-auditor.md        ← per-module stub-fill + staleness (used by /fx-doc)
 │   ├── module-auditor-rules.md  ← auditor behavioral rules
 │   ├── module-discoverer.md     ← per-module structure proposal (used by /fx-init)
 │   ├── module-discoverer-rules.md ← discoverer behavioral rules
@@ -35,6 +39,7 @@ p3-fenix-3.0.0/
 │   └── _topology.md             ← shared vocabulary reference (not auto-loaded)
 └── templates/
     ├── CLAUDE.md                ← repo-root file with bootstrap + routing rule
+    ├── DISCLAIMER.md            ← docs/DISCLAIMER.md (editable bootstrap ritual)
     ├── info.md                  ← docs/info.md template
     ├── STYLE.md                 ← docs/STYLE.md (conventions)
     ├── hint_index_map.md        ← docs/hint_index_map.md (with Reference docs section)
@@ -42,8 +47,18 @@ p3-fenix-3.0.0/
     ├── wing-README.md           ← per-module wing template
     ├── room.md                  ← room template
     ├── drawer.md                ← drawer template
-    └── reference.md             ← reference doc template (with extended frontmatter)
+    ├── reference.md             ← reference doc template (with extended frontmatter)
+    └── task.md, architect-plan.md, worker-log.md, tester-review.md, outcome.md, doc-audit.md
+                                  ← dev-workflow artifact templates
 ```
+
+## What's new in v3.2.0
+
+- **Delta-gated audits** — `/fx-doc audit` / `update` now spawn a `module-auditor` only for modules whose documented sources actually changed, or that still hold unfilled stubs. Unchanged modules are settled from a cheap cache with no subagent. On a stabilized codebase this turns "N auditors every run" into "0–2 per PR."
+- **`docs-meta/.fenix-cache.json`** — a derived index of every doc's frontmatter (`documents:`, `last_reviewed_commit`, `is_stub`). The orchestrator decides who to audit from one cheap per-doc `git log` pass (each doc against its own `last_reviewed_commit`) instead of reading wings. Re-sync any time with `/fx-doc audit --rebuild-cache`.
+- **Diff-scoped staleness** — when a doc is stale, the auditor reads `git diff <last_reviewed_commit>..HEAD -- <documents:>` instead of re-reading the whole module.
+- **Cheaper defaults** — `/fx-doc freshness` is the routine, code-free "what's stale" check; `/fx-doc update --only <module>` is the targeted expensive path; `--all` forces a full re-audit; `--suggest-drawers` gates the unconditional `src/` walk.
+- **Reliable manifest writes** — `setup.sh`'s manifest append passes values through the environment (no fragile string interpolation) and fails loudly instead of swallowing errors, so `/fx-uninstall` never skips files it should have recorded.
 
 ## What's new in v3.1.0
 
@@ -76,7 +91,7 @@ This downloads the latest release zip into a temp dir, extracts it, runs the ins
 Pin a specific version:
 
 ```bash
-FENIX_VERSION=3.1.0 bash -c "$(curl -fsSL https://raw.githubusercontent.com/ablack13/p-3-fenix/main/scripts/install-online.sh)"
+FENIX_VERSION=3.2.0 bash -c "$(curl -fsSL https://raw.githubusercontent.com/ablack13/p-3-fenix/main/scripts/install-online.sh)"
 ```
 
 Want to inspect the installer before running? Read it at <https://github.com/ablack13/p-3-fenix/blob/main/scripts/install-online.sh>.
@@ -84,10 +99,10 @@ Want to inspect the installer before running? Read it at <https://github.com/abl
 ### Manual install (download → unzip → run)
 
 ```bash
-curl -LO https://github.com/ablack13/p-3-fenix/releases/download/3.1.0/p3-fenix-3.1.0.zip
-unzip p3-fenix-3.1.0.zip
-./p3-fenix-3.1.0/scripts/setup.sh
-rm -rf p3-fenix-3.1.0 p3-fenix-3.1.0.zip
+curl -LO https://github.com/ablack13/p-3-fenix/releases/download/3.2.0/p3-fenix-3.2.0.zip
+unzip p3-fenix-3.2.0.zip
+./p3-fenix-3.2.0/scripts/setup.sh
+rm -rf p3-fenix-3.2.0 p3-fenix-3.2.0.zip
 ```
 
 ### After install
@@ -121,7 +136,7 @@ Reads `.fenix-manifest.json`, queries GitHub for the latest release, shows a pla
 **From the shell** — re-run the installer (one-command or manual) and it auto-detects the upgrade:
 
 - The installer reads `.fenix-manifest.json` to detect your current version.
-- It loads `scripts/upgrades/<from>-to-<to>.json` for the transition (e.g. `3.0.0-to-3.1.0.json`).
+- It loads `scripts/upgrades/<from>-to-<to>.json` for the transition (e.g. `3.1.0-to-3.2.0.json`).
 - Files marked `replace` are overwritten with the new version. The previous copy is moved to `_claude_backup/<new-version>-upgrade/<path>` so you can diff or recover.
 - Files marked `preserve` (your `CLAUDE.md`, `docs/info.md`, `docs/task-router.md`, `docs/hint_index_map.md`) are left untouched.
 - New files added in the target version (e.g. `docs/DISCLAIMER.md` in 3.1.0) are installed only if missing.
@@ -149,6 +164,10 @@ p3-fenix-*/
 # Per-install backup (only present after install on a non-empty repo)
 _claude_backup/
 
+# Derived /fx-doc cache (rebuilt on demand) and audit drafts
+docs-meta/.fenix-cache.json
+docs/_pending/
+
 # Per-user Claude Code settings
 .claude/settings.local.json
 ```
@@ -159,7 +178,9 @@ _claude_backup/
 |---|---|
 | Module path prefix | Auto-detect from manifest |
 | Per-module docs folder | `docs/` |
-| Freshness scan | Every audit, with `--skip-freshness` flag |
+| Auditor scope | Delta-gated — only modules with changed sources or stubs; `--all` for a full re-audit |
+| Drawer suggestions | Off — enable per run with `--suggest-drawers` |
+| Staleness gate | Per-doc `git log` since each doc's `last_reviewed_commit`, on every audit (cheap, intrinsic); `--stubs-only` to skip. Standalone report: `/fx-doc freshness` |
 | Re-stamp authority | Anyone touching the module |
 | `/fx-init` on partial repos | Leave existing files, only fill gaps |
 | Worker write authority | Worker only — architect and tester are read-only |
@@ -182,4 +203,4 @@ Per-agent behavioral rules (architect, worker, tester) include guidance adapted 
 
 ---
 
-*Last updated for: 3.1.0*
+*Last updated for: 3.2.0*

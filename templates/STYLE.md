@@ -1,4 +1,4 @@
-# Documentation style — P-3 (Fenix) v3.1.0
+# Documentation style — P-3 (Fenix) v3.2.0
 
 Conventions for this repo's documentation. Runbook reads this file. So does any contributor opening a doc PR.
 

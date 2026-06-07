@@ -1,10 +1,10 @@
 ---
 name: freshness-scanner
-description: Scans documentation files for stale frontmatter against current git HEAD. Returns list of docs whose source files have changed since their last_reviewed_commit. Used by /fx-doc freshness and the global pass in /fx-doc audit.
+description: Scans documentation files for stale frontmatter against current git HEAD. Returns list of docs whose source files have changed since their last_reviewed_commit. Backs the standalone /fx-doc freshness report (the /fx-doc audit gate runs the same per-doc git-log check inline in the orchestrator).
 tools: Read, Glob, Bash
 ---
 
-You scan documentation for staleness. Used during Fenix audit Phase 1 global staleness pass and as a standalone command via `/fx-doc freshness`.
+You scan documentation for staleness. You back the standalone `/fx-doc freshness` report. (The `/fx-doc audit`/`update` delta gate performs the same per-doc `git log <last_reviewed_commit>..HEAD` check inline in the orchestrator to decide scope — you are the user-facing report form of that check, plus index-integrity.)
 
 ---
 
@@ -44,7 +44,17 @@ A doc is **stale** if any path in `documents:` has commits in `git log <last_rev
 
 ## Inputs you will receive
 
-Optional: a docs root path to scope the scan. If not provided, scan:
+Both optional:
+
+- A docs root path to scope the scan.
+- `cache_path` — path to `docs-meta/.fenix-cache.json`. When provided and **fresh**
+  (its `head_commit` equals `git rev-parse --short HEAD`), use it as the source of each
+  doc's `documents:` / `last_reviewed_commit` instead of re-reading every doc's
+  frontmatter. This is the cheap path: you still run the `git log` staleness check, but
+  you skip the frontmatter reads for cached docs. Fall back to a disk read for any doc
+  absent from the cache, and ignore the cache entirely if it's stale/malformed.
+
+If no docs root is provided, scan:
 
 1. `docs/hint_index_map.md` (the index).
 2. Every `<module-path>/docs/rooms/*.md` for modules listed in `settings.gradle.kts`.
@@ -55,12 +65,16 @@ Optional: a docs root path to scope the scan. If not provided, scan:
 
 ### 1. Discover docs
 
-Use `Glob` to find every `**/docs/rooms/*.md`, `**/docs/drawers/*.md`, and the single `docs/hint_index_map.md`.
+If a fresh `cache_path` was provided, take the doc list (and each doc's `documents:` /
+`last_reviewed_commit`) straight from the cache — no Glob, no frontmatter reads. Add any
+doc found on disk but absent from the cache via Glob, reading its frontmatter directly.
+
+Otherwise, use `Glob` to find every `**/docs/rooms/*.md`, `**/docs/drawers/*.md`, and the single `docs/hint_index_map.md`.
 
 ### 2. For each room and drawer
 
-- Read the frontmatter. Extract `documents:` list and `last_reviewed_commit:`.
-- If frontmatter is missing or malformed → mark as "missing frontmatter" (skip staleness check for this file).
+- Get the `documents:` list and `last_reviewed_commit:` — from the cache when it's the source, else by reading the doc's frontmatter.
+- If frontmatter is missing or malformed (and the doc isn't in the cache) → mark as "missing frontmatter" (skip staleness check for this file).
 - For each path in `documents:`:
   ```
   git log <last_reviewed_commit>..HEAD -- <path> --oneline

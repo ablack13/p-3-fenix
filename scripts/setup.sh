@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# scripts/setup.sh — install P-3 (Fenix) 3.1.0 kit into the current repo
+# scripts/setup.sh — install P-3 (Fenix) 3.2.0 kit into the current repo
 #
 # Usage:
-#   ./scripts/setup.sh                          # uses ~/Downloads/p3-fenix-3.1.0.zip
+#   ./scripts/setup.sh                          # uses ~/Downloads/p3-fenix-3.2.0.zip
 #   ./scripts/setup.sh /path/to/kit.zip         # explicit zip path
 #
 # Idempotent: safe to re-run. Never overwrites existing files.
@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-FENIX_VERSION="3.1.0"
+FENIX_VERSION="3.2.0"
 KIT_NAME="p3-fenix-${FENIX_VERSION}"
 
 # --- args & defaults --------------------------------------------------------
@@ -51,7 +51,7 @@ section() { printf '\n%s%s%s\n' "$BOLD" "$1" "$RESET"; }
 
 # Manifest is a flat JSON file. We use simple shell-side appends because
 # we don't want a jq dependency. The format:
-# {"fenix_version":"3.1.0","installed_at":"...","actions":[...]}
+# {"fenix_version":"3.2.0","installed_at":"...","actions":[...]}
 # Action types: create, create-dir, modify, backup-move,
 #               upgrade-replace, upgrade-remove (added in 3.1.0),
 #               rename-on-install (legacy, no longer emitted).
@@ -76,20 +76,41 @@ manifest_append() {
   local action="$1"
   local path="$2"
   local extras="${3:-}"
-  # Use python for JSON manipulation to avoid jq dependency.
-  python3 -c "
-import json, sys
-with open('$MANIFEST_PATH') as f:
+  # Values are passed through the ENVIRONMENT, never interpolated into the Python
+  # source. A repo path or project name containing a quote, backslash, or newline
+  # used to corrupt the generated literal and — because the call ended in
+  # `2>/dev/null || true` — the manifest write failed SILENTLY, so /fx-uninstall
+  # later skipped files it had no record of. Now the heredoc is quoted (no shell
+  # expansion) and a failed write surfaces loudly via fail().
+  if ! FENIX_MA_ACTION="$action" \
+       FENIX_MA_PATH="$path" \
+       FENIX_MA_EXTRAS="$extras" \
+       FENIX_MA_TIMESTAMP="$TIMESTAMP" \
+       FENIX_MA_MANIFEST="$MANIFEST_PATH" \
+       python3 - <<'PYEOF'
+import json, os
+
+manifest = os.environ["FENIX_MA_MANIFEST"]
+with open(manifest) as f:
     m = json.load(f)
-entry = {'action': '$action', 'path': '$path', 'timestamp': '$TIMESTAMP'}
-extras = '''$extras'''
-if extras.strip():
-    extras_dict = json.loads('{' + extras + '}')
-    entry.update(extras_dict)
-m['actions'].append(entry)
-with open('$MANIFEST_PATH', 'w') as f:
+
+entry = {
+    "action": os.environ["FENIX_MA_ACTION"],
+    "path": os.environ["FENIX_MA_PATH"],
+    "timestamp": os.environ["FENIX_MA_TIMESTAMP"],
+}
+
+extras = os.environ.get("FENIX_MA_EXTRAS", "").strip()
+if extras:
+    entry.update(json.loads("{" + extras + "}"))
+
+m["actions"].append(entry)
+with open(manifest, "w") as f:
     json.dump(m, f, indent=2)
-" 2>/dev/null || true
+PYEOF
+  then
+    fail "Manifest write failed (action=$action, path=$path). Aborting so /fx-uninstall stays reliable."
+  fi
 }
 
 # --- sanity checks ----------------------------------------------------------
@@ -295,7 +316,9 @@ remove_with_backup() {
 apply_upgrade() {
   local upgrade_file="$1"
   local to_version
-  to_version="$(python3 -c "import json; print(json.load(open('$upgrade_file'))['to'])")"
+  # Path via env (single-quoted -c), so an upgrade-file path with quotes/backslashes
+  # can't corrupt the Python source. Same rationale as manifest_append.
+  to_version="$(FENIX_UP_FILE="$upgrade_file" python3 -c 'import json,os; print(json.load(open(os.environ["FENIX_UP_FILE"]))["to"])')"
   local backup_subdir="${to_version}-upgrade"
 
   mkdir -p "$CLAUDE_BACKUP_DIR/$backup_subdir"
@@ -313,42 +336,59 @@ apply_upgrade() {
       continue
     fi
     replace_with_backup "$src" "$rel" "$backup_subdir"
-  done < <(python3 -c "import json; print('\n'.join(json.load(open('$upgrade_file')).get('replace', [])))")
+  done < <(FENIX_UP_FILE="$upgrade_file" python3 -c 'import json,os; print("\n".join(json.load(open(os.environ["FENIX_UP_FILE"])).get("replace", [])))')
 
   # remove[]
   while IFS= read -r rel; do
     [[ -z "$rel" ]] && continue
     remove_with_backup "$rel" "$backup_subdir"
-  done < <(python3 -c "import json; print('\n'.join(json.load(open('$upgrade_file')).get('remove', [])))")
+  done < <(FENIX_UP_FILE="$upgrade_file" python3 -c 'import json,os; print("\n".join(json.load(open(os.environ["FENIX_UP_FILE"])).get("remove", [])))')
 
   # create_if_missing[] — handled by the normal copy_if_missing flow that
   # runs after this function, so we don't repeat it here. The normal flow
   # will pick up any net-new files.
 
-  # Bump manifest version + record upgrade entry.
-  python3 - <<PYEOF
-import json
-with open('$MANIFEST_PATH') as f:
+  # Bump manifest version + record upgrade entry. Values via env; QUOTED heredoc so
+  # nothing (manifest path, versions, timestamp, backup dir) is interpolated into the
+  # Python source — same hardening as manifest_append. Aborts loudly on failure.
+  FENIX_UP_MANIFEST="$MANIFEST_PATH" \
+  FENIX_UP_TO="$FENIX_VERSION" \
+  FENIX_UP_FROM="$INSTALLED_VERSION" \
+  FENIX_UP_TS="$TIMESTAMP" \
+  FENIX_UP_BACKUP="_claude_backup/$backup_subdir/" \
+  python3 - <<'PYEOF'
+import json, os
+
+manifest = os.environ["FENIX_UP_MANIFEST"]
+with open(manifest) as f:
     m = json.load(f)
-m['fenix_version'] = '$FENIX_VERSION'
-m.setdefault('upgrades', []).append({
-    'from': '$INSTALLED_VERSION',
-    'to': '$FENIX_VERSION',
-    'timestamp': '$TIMESTAMP',
-    'backup_dir': '_claude_backup/$backup_subdir/'
+m["fenix_version"] = os.environ["FENIX_UP_TO"]
+m.setdefault("upgrades", []).append({
+    "from": os.environ["FENIX_UP_FROM"],
+    "to": os.environ["FENIX_UP_TO"],
+    "timestamp": os.environ["FENIX_UP_TS"],
+    "backup_dir": os.environ["FENIX_UP_BACKUP"],
 })
-with open('$MANIFEST_PATH', 'w') as f:
+with open(manifest, "w") as f:
     json.dump(m, f, indent=2)
 PYEOF
 }
 
-INSTALLED_VERSION="$(python3 -c "
-import json
+# Read the installed version. Path via env, QUOTED heredoc — no interpolation. A
+# missing manifest legitimately means "fresh install" → empty. A genuinely corrupt
+# manifest is NOT swallowed: Python exits non-zero, the command substitution fails, and
+# `set -e` aborts loudly rather than silently degrading to '' (which would skip both the
+# upgrade and the downgrade guard, treating an existing install as fresh).
+INSTALLED_VERSION="$(
+  FENIX_MV_MANIFEST="$MANIFEST_PATH" python3 - <<'PYEOF'
+import json, os
 try:
-    print(json.load(open('$MANIFEST_PATH')).get('fenix_version', ''))
-except Exception:
-    print('')
-" 2>/dev/null || echo "")"
+    with open(os.environ["FENIX_MV_MANIFEST"]) as f:
+        print(json.load(f).get("fenix_version", ""))
+except FileNotFoundError:
+    print("")
+PYEOF
+)"
 
 if [[ -n "$INSTALLED_VERSION" && "$INSTALLED_VERSION" != "$FENIX_VERSION" ]]; then
   if version_lt "$INSTALLED_VERSION" "$FENIX_VERSION"; then
@@ -368,11 +408,17 @@ fi
 
 section "Creating directories"
 
+# Parents listed before children so the reverse-order /fx-uninstall walk removes the
+# child dirs first, then rmdir's the now-empty parents (.claude, docs, docs-meta).
+# Without registering the parents, an empty docs-meta/ etc. is left behind on uninstall.
 for dir in \
+  "$REPO_ROOT/.claude" \
   "$REPO_ROOT/.claude/commands" \
   "$REPO_ROOT/.claude/agents" \
+  "$REPO_ROOT/docs" \
   "$REPO_ROOT/docs/_pending" \
   "$REPO_ROOT/docs/_history" \
+  "$REPO_ROOT/docs-meta" \
   "$REPO_ROOT/docs-meta/templates" \
   "$REPO_ROOT/reference" \
   "$REPO_ROOT/tasks"
@@ -564,6 +610,7 @@ Manifest:
 
 Optional cleanup:
   - .gitignore ${DIM}docs/_pending/${RESET} to keep audit drafts out of git.
+  - .gitignore ${DIM}docs-meta/.fenix-cache.json${RESET} — derived /fx-doc cache, rebuilt on demand.
 EOF
 
 # Detect distribution artifacts inside the repo root and print a copy-paste

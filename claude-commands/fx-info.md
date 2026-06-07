@@ -11,6 +11,7 @@ Read-only. Don't trigger an audit. Don't load full docs. Cheap status output.
    - `reference/`
    - `tasks/`
    - `.fenix-manifest.json`
+   - `docs-meta/.fenix-cache.json` (derived /fx-doc cache)
 
 2. If `docs/info.md` exists, extract the first blockquote after the H1 title — that's the summary.
 
@@ -31,12 +32,13 @@ Read-only. Don't trigger an audit. Don't load full docs. Cheap status output.
 ## Output — fully initialized repo
 
 ```
-P-3 (Fenix) v3.1.0
+P-3 (Fenix) v3.2.0
 
 <summary line from docs/info.md>
 
 Topology:    wings/rooms/drawers decentralized (per-module docs/)
 Freshness:   enabled
+Doc cache:   present | absent (built on first /fx-doc run)
 CLAUDE.md:   populated
 Index:       docs/hint_index_map.md
 Setup notes: docs/info.md
@@ -59,7 +61,7 @@ Manifest:    .fenix-manifest.json (N actions recorded)
 ## Output — uninitialized repo
 
 ```
-P-3 (Fenix) v3.1.0
+P-3 (Fenix) v3.2.0
 
 ⚠ Repo not initialized. Run /fx-init to bootstrap wings/rooms/drawers structure.
 
@@ -78,7 +80,7 @@ Detected:
 ## Output — partially initialized
 
 ```
-P-3 (Fenix) v3.1.0
+P-3 (Fenix) v3.2.0
 
 ⚠ Partial setup. Run /fx-init to fill gaps.
 
