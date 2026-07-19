@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# scripts/setup.sh — install P-3 (Fenix) 3.2.0 kit into the current repo
+# scripts/setup.sh — install P-3 (Fenix) 4.0.0 kit into the current repo
 #
 # Usage:
-#   ./scripts/setup.sh                          # uses ~/Downloads/p3-fenix-3.2.0.zip
+#   ./scripts/setup.sh                          # uses ~/Downloads/p3-fenix-4.0.0.zip
 #   ./scripts/setup.sh /path/to/kit.zip         # explicit zip path
 #
 # Idempotent: safe to re-run. Never overwrites existing files.
@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-FENIX_VERSION="3.2.0"
+FENIX_VERSION="4.0.0"
 KIT_NAME="p3-fenix-${FENIX_VERSION}"
 
 # --- args & defaults --------------------------------------------------------
@@ -51,7 +51,7 @@ section() { printf '\n%s%s%s\n' "$BOLD" "$1" "$RESET"; }
 
 # Manifest is a flat JSON file. We use simple shell-side appends because
 # we don't want a jq dependency. The format:
-# {"fenix_version":"3.2.0","installed_at":"...","actions":[...]}
+# {"fenix_version":"4.0.0","installed_at":"...","actions":[...]}
 # Action types: create, create-dir, modify, backup-move,
 #               upgrade-replace, upgrade-remove (added in 3.1.0),
 #               rename-on-install (legacy, no longer emitted).
@@ -314,6 +314,70 @@ remove_with_backup() {
   manifest_append "upgrade-remove" "$rel" "\"backup_path\": \"_claude_backup/$backup_subdir/$rel\""
 }
 
+# Sweep consumer-generated docs artifacts recorded in the manifest (4.0.0 upgrade).
+# Patterns come from the upgrade JSON's sweep_manifest_patterns[]. Every matching
+# manifest-recorded path that still exists on disk is moved to _claude_backup/ —
+# never hard-deleted, because auditor-filled wings hold human-approved prose.
+# Only paths Fenix itself recorded (create / create-dir / stub-fill) are touched;
+# user files (e.g. hand-written reference/*.md) are not in those entries and stay.
+apply_manifest_sweep() {
+  local upgrade_file="$1"
+  local backup_subdir="$2"
+
+  local sweep_list
+  sweep_list="$(
+    FENIX_SW_FILE="$upgrade_file" FENIX_SW_MANIFEST="$MANIFEST_PATH" python3 - <<'PYEOF'
+import fnmatch, json, os
+
+with open(os.environ["FENIX_SW_FILE"]) as f:
+    patterns = [p.rstrip("/") for p in json.load(f).get("sweep_manifest_patterns", [])]
+if patterns:
+    with open(os.environ["FENIX_SW_MANIFEST"]) as f:
+        actions = json.load(f).get("actions", [])
+    seen = set()
+    for a in actions:
+        p = (a.get("path") or "").rstrip("/")
+        if not p or p in seen or a.get("action") not in ("create", "create-dir", "stub-fill"):
+            continue
+        if any(fnmatch.fnmatch(p, pat) for pat in patterns):
+            seen.add(p)
+            kind = "D" if (a.get("action") == "create-dir" or os.path.isdir(p)) else "F"
+            print(kind + "\t" + p)
+PYEOF
+  )"
+
+  [[ -z "$sweep_list" ]] && return 0
+
+  section "Sweeping generated docs (backed up, not deleted)"
+
+  local kind rel
+  local -a sweep_dirs=()
+  while IFS=$'\t' read -r kind rel; do
+    [[ -z "$rel" ]] && continue
+    if [[ "$kind" == "D" ]]; then
+      sweep_dirs+=("$rel")
+    else
+      remove_with_backup "$rel" "$backup_subdir"
+    fi
+  done <<< "$sweep_list"
+
+  # Prune swept directories bottom-up once their files are in backup. A dir that
+  # still holds user files (untracked by the manifest) is left in place.
+  # (${#arr[@]} guard: empty-array expansion trips `set -u` on macOS bash 3.2.)
+  if (( ${#sweep_dirs[@]} > 0 )); then
+    local d
+    for d in "${sweep_dirs[@]}"; do
+      [[ -d "$REPO_ROOT/$d" ]] || continue
+      find "$REPO_ROOT/$d" -depth -type d -empty -delete 2>/dev/null || true
+      if [[ ! -d "$REPO_ROOT/$d" ]]; then
+        ok "Pruned empty dir $d/"
+      else
+        warn "$d/ kept — contains files the manifest doesn't own"
+      fi
+    done
+  fi
+}
+
 apply_upgrade() {
   local upgrade_file="$1"
   local to_version
@@ -326,6 +390,8 @@ apply_upgrade() {
 
   # replace[]
   local rel src
+  local project_name
+  project_name="$(basename "$REPO_ROOT")"
   while IFS= read -r rel; do
     [[ -z "$rel" ]] && continue
     if ! src="$(kit_source_for "$rel")"; then
@@ -336,6 +402,11 @@ apply_upgrade() {
       warn "Source missing in kit for $rel ($src) — skipping"
       continue
     fi
+    if [[ "$rel" == "CLAUDE.md" ]]; then
+      # The template carries {{PROJECT_NAME}}; render it like a fresh install does.
+      sed "s/{{PROJECT_NAME}}/$project_name/g" "$src" > "$TMP_DIR/CLAUDE.md.rendered"
+      src="$TMP_DIR/CLAUDE.md.rendered"
+    fi
     replace_with_backup "$src" "$rel" "$backup_subdir"
   done < <(FENIX_UP_FILE="$upgrade_file" python3 -c 'import json,os; print("\n".join(json.load(open(os.environ["FENIX_UP_FILE"])).get("replace", [])))')
 
@@ -344,6 +415,9 @@ apply_upgrade() {
     [[ -z "$rel" ]] && continue
     remove_with_backup "$rel" "$backup_subdir"
   done < <(FENIX_UP_FILE="$upgrade_file" python3 -c 'import json,os; print("\n".join(json.load(open(os.environ["FENIX_UP_FILE"])).get("remove", [])))')
+
+  # sweep_manifest_patterns[] — consumer-generated docs recorded in the manifest
+  apply_manifest_sweep "$upgrade_file" "$backup_subdir"
 
   # create_if_missing[] — handled by the normal copy_if_missing flow that
   # runs after this function, so we don't repeat it here. The normal flow
@@ -537,7 +611,7 @@ Read first:
 Next steps:
   1. Open Claude Code in this repo.
   2. Run ${BOLD}/fx-init${RESET}. It generates the repo map inside CLAUDE.md,
-     drafts info.md, and scaffolds .claude/rules/.
+     drafts info.md, and adds per-module rules (always-on rules are already installed).
   3. Run ${BOLD}/fx-info${RESET} anytime to confirm status.
 
 Day-to-day commands:

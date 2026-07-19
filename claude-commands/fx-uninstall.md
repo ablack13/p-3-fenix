@@ -17,18 +17,19 @@ Either:
 - The manifest was deleted manually.
 - A pre-manifest install (very early Fenix versions).
 
-For pre-manifest installs, manual cleanup is required. The typical paths to remove are:
+For pre-manifest installs, manual cleanup is required. The typical v4 paths to remove are:
   - .claude/commands/fx-*.md
-  - .claude/agents/{architect,worker,tester,module-*,freshness-*,reference-*}*.md
-  - .claude/agents/_topology.md
-  - docs/info.md, docs/STYLE.md, docs/hint_index_map.md, docs/task-router.md
-  - docs/_pending/, docs/_history/
-  - reference/
+  - .claude/agents/{architect,worker,tester}*.md
+  - .claude/rules/{git-workflow,fenix-conventions}.md (+ generated per-module rules)
+  - docs/info.md, docs/DISCLAIMER.md
   - tasks/
   - docs-meta/
   - CLAUDE.md (only the Fenix one)
   - "P-3 (Fenix)- READ BEFORE FIRST.md"
   - .fenix-manifest.json
+  (Legacy 3.x installs additionally: .claude/agents/{module-*,freshness-*,reference-*}*.md,
+   _topology.md, docs/STYLE.md, docs/hint_index_map.md, docs/task-router.md,
+   docs/_pending/, docs/_history/, reference/, <module>/docs/ wings.)
 
 If `_claude_backup/` exists, manually move its contents back:
   mv _claude_backup/CLAUDE.md ./CLAUDE.md
@@ -72,10 +73,10 @@ A file removed during an upgrade. The file was moved to `backup_path`. For unins
 - Nothing to remove (already gone from live tree).
 - Leave the backup in place. Same manual-recovery note as `upgrade-replace`.
 
-#### action: `stub-fill`
-Auditor wrote real prose into a stub. The stub-filled doc is preserved (it has user value). Don't mark for removal — those are scaffold files Fenix created.
+#### action: `stub-fill` *(legacy — 3.x manifests only)*
+Auditor wrote real prose into a stub. The stub-filled doc is preserved (it has user value). Don't mark for removal — those are scaffold files Fenix created. (In repos upgraded to 4.0.0, these docs were already swept into `_claude_backup/4.0.0-upgrade/`.)
 
-#### action: `reference-link`
+#### action: `reference-link` *(legacy — 3.x manifests only)*
 Reference file was linked. The reference file itself was created by the user; Fenix only added frontmatter and an index entry. On uninstall:
 - Don't delete the reference file.
 - Strip the Fenix frontmatter from it (revert to plain markdown).
@@ -93,7 +94,8 @@ Before deleting anything, build a report:
 
 Files to be REMOVED (created by Fenix):
   .claude/commands/fx-init.md
-  .claude/commands/fx-doc.md
+  .claude/commands/fx-task.md
+  .claude/rules/git-workflow.md
   ... (full list)
 
 Files to be RESTORED from _claude_backup/:
@@ -109,8 +111,7 @@ Files Fenix MODIFIED but won't auto-revert (no pre-Fenix backup):
 
 User content detected in Fenix-managed locations:
 
-  modules/practice/docs/rooms/persistence.md (auditor-filled, then edited by user — N changes)
-  reference/error-handling.md (user-created, Fenix-linked — N edits)
+  .claude/rules/practice.md (Fenix-created, then edited by user — N changes)
   tasks/2026-05-08-skip-button/ (active task, status=open)
 
 ⚠ Removing the above will lose your work.
@@ -118,14 +119,12 @@ User content detected in Fenix-managed locations:
 To preserve content before uninstall, run one of:
 
   Option A — Stash with git:
-    git stash push -- modules/practice/docs/rooms/persistence.md \
-                      reference/error-handling.md \
+    git stash push -- .claude/rules/practice.md \
                       tasks/2026-05-08-skip-button/
 
   Option B — Copy to a backup folder:
     mkdir -p ~/fenix-uninstall-backup-$(date +%Y%m%d)
-    cp -r modules/practice/docs/rooms/persistence.md \
-          reference/error-handling.md \
+    cp -r .claude/rules/practice.md \
           tasks/2026-05-08-skip-button/ \
           ~/fenix-uninstall-backup-$(date +%Y%m%d)/
 
@@ -148,9 +147,10 @@ Proceed with uninstall?
 ```
 
 Detection logic for "user content":
-- Stub-filled docs: check git history. If commits exist for the file AFTER the stub-fill manifest entry's timestamp, user has edited it.
-- Reference files: any file in `reference/` not created by `init` is user-created. Any commits to a Fenix-linked reference after its `reference-link` manifest entry are user edits.
+- Rules files: check git history. If commits exist for a `.claude/rules/*.md` file AFTER its `create` manifest entry's timestamp, the user has edited it — their invariants live there.
+- CLAUDE.md map block: content between the FENIX:MAP markers is regenerable, but content the user added outside the markers is user content (the backup-move restore covers the pre-Fenix file; hand edits since install are flagged via git history).
 - Tasks: any task folder where `outcome.md` doesn't exist (or status != closed) is "active." Closed tasks are historical record but still user content.
+- Legacy 3.x manifests: stub-filled docs and Fenix-linked reference files follow the legacy sections above.
 - `_claude_backup/` edits: best-effort `find _claude_backup -newer .fenix-manifest.json` heuristic.
 
 ### Step 4: Execute removal
@@ -160,7 +160,7 @@ After developer chooses option 1, **process in this order**:
 1. **Remove Fenix-created files first.** Walk manifest in reverse. For each `create` and `modify` (where no later `backup-move` restores it): delete the file. For each `create-dir`: `rmdir` if empty.
 2. **Restore backups second.** For each `backup-move` entry: `mv _claude_backup/<to>` back to `<path>`. Order matters — destination paths (`CLAUDE.md`, `.claude/`) must already be free from step 1.
 3. **Restore legacy quarantine** (only if `rename-on-install` entries exist): read `CLAUDE.md.old`, strip header through `# IGNORE-FROM-HERE-DOWN`, write to `CLAUDE.md`, delete `.old`.
-4. **Strip reference-linker frontmatter.** For each `reference-link`: read the reference file, strip the `---…---` block Fenix added, write back. Don't delete the file itself.
+4. **Strip reference-linker frontmatter** *(legacy 3.x manifests only)*. For each `reference-link`: read the reference file, strip the `---…---` block Fenix added, write back. Don't delete the file itself.
 5. **Clean up `_claude_backup/`.** After all `backup-move` restores succeed, delete `_claude_backup/IGNORE_THIS_FOLDER.md` and `_claude_backup/.claudeignore`. Then `rmdir _claude_backup/` (must be empty).
 6. **Update manifest as we go** so partial uninstall can resume.
 7. **Last step:** delete `.fenix-manifest.json`.
@@ -199,8 +199,8 @@ Fenix is fully uninstalled. To re-install, run scripts/setup.sh again.
 
 - Manifest is the source of truth. Don't try to detect Fenix files heuristically. If the manifest is missing or malformed, abort.
 - `tasks/` content is always treated as user content. Never auto-delete without explicit confirmation.
-- Stub-filled docs that user has since edited are user content.
-- Reference files are user content; only Fenix frontmatter gets stripped.
+- User-edited `.claude/rules/*.md` files are user content — warn before removing.
+- Legacy 3.x: stub-filled docs the user edited are user content; reference files are user content, only Fenix frontmatter gets stripped.
 - `_claude_backup/` is restored, not deleted-and-lost. If a destination already exists at restore time, abort rather than overwrite.
 - Legacy `CLAUDE.md.old` flow: strip the disclaimer header before restoring. Marker line `# IGNORE-FROM-HERE-DOWN` is the cutoff — everything above it is the Fenix-added quarantine notice; everything below is the original file content. Kept for backward compatibility with pre-3.0.0 manifests only.
 - Never delete `.git/`, never touch git history.
