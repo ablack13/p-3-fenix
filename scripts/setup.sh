@@ -267,6 +267,7 @@ kit_source_for() {
   case "$rel" in
     .claude/agents/*)      printf '%s/claude-agents/%s' "$KIT_DIR" "${rel#.claude/agents/}" ;;
     .claude/commands/*)    printf '%s/claude-commands/%s' "$KIT_DIR" "${rel#.claude/commands/}" ;;
+    .claude/rules/*)       printf '%s/templates/rules-%s' "$KIT_DIR" "${rel#.claude/rules/}" ;;
     docs-meta/runbook.md)  printf '%s/runbook.md' "$KIT_DIR" ;;
     docs-meta/templates/*) printf '%s/templates/%s' "$KIT_DIR" "${rel#docs-meta/templates/}" ;;
     docs/*)                printf '%s/templates/%s' "$KIT_DIR" "${rel#docs/}" ;;
@@ -415,6 +416,7 @@ for dir in \
   "$REPO_ROOT/.claude" \
   "$REPO_ROOT/.claude/commands" \
   "$REPO_ROOT/.claude/agents" \
+  "$REPO_ROOT/.claude/rules" \
   "$REPO_ROOT/docs" \
   "$REPO_ROOT/docs-meta" \
   "$REPO_ROOT/docs-meta/templates" \
@@ -451,6 +453,16 @@ copy_if_missing "$KIT_DIR/claude-agents/worker.md"                  "$REPO_ROOT/
 copy_if_missing "$KIT_DIR/claude-agents/worker-rules.md"            "$REPO_ROOT/.claude/agents/worker-rules.md"
 copy_if_missing "$KIT_DIR/claude-agents/tester.md"                  "$REPO_ROOT/.claude/agents/tester.md"
 copy_if_missing "$KIT_DIR/claude-agents/tester-rules.md"            "$REPO_ROOT/.claude/agents/tester-rules.md"
+
+# --- always-on rules -------------------------------------------------------
+#
+# No paths: frontmatter — these load at session start. Per-module (paths:-scoped)
+# rules are generated later by /fx-init, not installed here.
+
+section "Installing rules"
+
+copy_if_missing "$KIT_DIR/templates/rules-git-workflow.md"      "$REPO_ROOT/.claude/rules/git-workflow.md"
+copy_if_missing "$KIT_DIR/templates/rules-fenix-conventions.md" "$REPO_ROOT/.claude/rules/fenix-conventions.md"
 
 # --- docs/ shared files ----------------------------------------------------
 
@@ -500,6 +512,9 @@ fi
 section "Installing reference material (docs-meta/)"
 
 copy_if_missing "$KIT_DIR/runbook.md"                     "$REPO_ROOT/docs-meta/runbook.md"
+copy_if_missing "$KIT_DIR/templates/rules-git-workflow.md"      "$REPO_ROOT/docs-meta/templates/rules-git-workflow.md"
+copy_if_missing "$KIT_DIR/templates/rules-fenix-conventions.md" "$REPO_ROOT/docs-meta/templates/rules-fenix-conventions.md"
+copy_if_missing "$KIT_DIR/templates/rules-module.md"            "$REPO_ROOT/docs-meta/templates/rules-module.md"
 copy_if_missing "$KIT_DIR/templates/task.md"              "$REPO_ROOT/docs-meta/templates/task.md"
 copy_if_missing "$KIT_DIR/templates/architect-plan.md"    "$REPO_ROOT/docs-meta/templates/architect-plan.md"
 copy_if_missing "$KIT_DIR/templates/worker-log.md"        "$REPO_ROOT/docs-meta/templates/worker-log.md"
