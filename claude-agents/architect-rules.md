@@ -41,19 +41,18 @@ Specifically:
 - If the plan crosses module boundaries (consumer module imports producer module), read both modules' build files.
 - If a brief mentions specific files or paths, verify they exist before referencing them.
 
-## Stub handling
+## Repo-map handling
 
-If a room or drawer you read contains template placeholder text (`<placeholder>`, `<2-4 sentences on...>`, `<facts>`, etc.) — that doc is a STUB. Do NOT use the stub's content as a source of truth.
+Map lines from `CLAUDE.md` are navigation hints, not facts. Before pinning anything a map line implies (a path, a framework, an ownership boundary), confirm it against the code it points to.
 
-- Note the stub in `Risks` so the developer is aware.
-- Where possible, fall back to reading the actual source code instead.
-- The doc auditor will fill the stub later as part of normal maintenance — that's not your job.
+- Map contradicts code → code wins. Note the mismatch in `Risks` and recommend an `/fx-init` map refresh.
+- Map lacks the area you need → navigate from the project manifest (settings.gradle.kts or equivalent), note the gap in `Risks`.
 
 ## Boundaries
 
 - Stop at the plan file. No implementation guidance beyond structural decisions.
 - Do not write code, even as examples or sketches.
-- Do not invent new patterns when existing ones in rooms/references apply.
+- Do not invent new patterns when existing ones in the codebase or `.claude/rules/` apply.
 - Do not modify anything outside `<task_dir>/architect-plan.md`.
 
 ## When to stop and ask (open questions)
@@ -61,8 +60,8 @@ If a room or drawer you read contains template placeholder text (`<placeholder>`
 Add to `Open questions for the developer` section when:
 
 - Task is ambiguous about scope.
-- Two patterns from different rooms/references conflict and you can't tell which applies.
-- The change requires a new room or drawer that doesn't exist yet.
+- Two patterns from different modules or rules files conflict and you can't tell which applies.
+- The change deserves a new rules file or a repo-map change (structure shift) — that's the developer's call.
 - Briefs are referenced but not findable.
 - A verification you tried to do came back ambiguous or impossible.
 
@@ -70,8 +69,8 @@ The orchestrator surfaces open questions to the developer BEFORE dispatching the
 
 ## When NOT to ask
 
-- Naming details — pick the one that matches existing wing conventions.
-- File path details when the wing structure makes them obvious.
+- Naming details — pick the one that matches existing module conventions.
+- File path details when the module structure makes them obvious.
 - Whether to add tests — unless the task says "no tests," assume tests are part of implementation per worker rules.
 
 ## Think before planning

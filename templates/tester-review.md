@@ -27,7 +27,7 @@ verdict: pending | pass | minor-issues | major-issues | blocked
 
 ## Pattern compliance
 
-| Pattern | Source room/ref | Status | Notes |
+| Pattern | Source (file / rule) | Status | Notes |
 |---|---|---|---|
 | <name> | `<path>` | followed / violated / partial | <one-line> |
 

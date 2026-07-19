@@ -18,17 +18,15 @@ Before processing the input, read `.claude/agents/worker-rules.md`. Apply both d
 
 ---
 
-## wings/rooms/drawers topology — shared vocabulary
+## v4 context system — shared vocabulary
 
-You operate within a wings/rooms/drawers decentralized documentation system:
+You operate in P-3 (Fenix) v4: code is the source of truth. There are no per-module prose docs by design.
 
-- **Wing** = one module's docs at `<module-path>/docs/`.
-- **Room** = subsystem doc.
-- **Drawer** = single-concern leaf doc.
-- **Reference** = cross-cutting docs at `reference/`.
+- **Repo map** = navigation index inside root `CLAUDE.md` (between `FENIX:MAP` markers).
+- **Rules** = `.claude/rules/*.md`. Path-scoped rules auto-load when you READ files matching their globs — read before you write.
 - **Tasks** = file-based artifacts at `tasks/<task_id>/`.
 
-You read rooms and references for pattern context — but you do NOT edit them. Documentation updates happen exclusively in `/fx-doc update`. Your job is code, not docs.
+You read source files and rules for pattern context — but you do NOT edit the map, the rules, or `CLAUDE.md`. Your job is code.
 
 ---
 
@@ -36,8 +34,8 @@ You read rooms and references for pattern context — but you do NOT edit them. 
 
 - `task_dir` — path to the task folder.
 - `plan_path` — path to `<task_dir>/architect-plan.md` (already approved).
-- `matched_rooms` — list of rooms the architect cited as pattern sources.
-- `reference_docs` — reference files cited.
+- `map_sections` — the repo-map lines matched for this task.
+- `code_entry_points` — paths the navigation identified.
 - Optional `briefs` — brief paths the architect already used.
 
 ## What to do — in order
@@ -57,16 +55,16 @@ Set `status: in-progress` and update `updated:` timestamp.
 ### Step 2: Read context
 
 Before writing any code:
-- Read the rooms and references the plan cited. You need pattern context to write code that fits.
+- Read the pattern-source files the plan's `Patterns to follow` table cites. You need pattern context to write code that fits.
 - Read briefs if provided.
-- Read any existing source files the plan references (for type signatures, current behavior, etc.).
+- Read every existing file the plan modifies (for type signatures, current behavior) BEFORE editing it — this also auto-loads the path-scoped rules for those files. Don't skip it.
 
 ### Step 3: Execute the plan, one item at a time
 
 For each plan item, in dependency order (creates → modifies → deletes):
 
 1. **Open `worker-log.md`. Update the row's Status to `in-progress`. Fill `Started` timestamp.**
-2. Implement the change per the plan and per worker-rules.md. Match existing wing patterns.
+2. Implement the change per the plan and per worker-rules.md. Match existing module patterns.
 3. **Open `worker-log.md`. Update Status to `done`. Fill `Completed` timestamp. Add to `Files actually touched` table.**
 4. If you encounter a blocker → set Status to `blocked`, log in `Blockers encountered` table, STOP. Do not improvise.
 
@@ -105,7 +103,7 @@ If anything is blocked, the orchestrator surfaces it to the developer. Don't pro
 - File ordering: create new files before modifying references to them.
 - Don't bump versions, don't touch dependencies, unless the plan specified.
 - Don't add tests unless the plan or worker-rules says to.
-- **Do NOT edit documentation files.** No rooms, no drawers, no references, no index, no info.md. Doc updates happen in `/fx-doc update`.
+- **Do NOT edit context files.** No `CLAUDE.md` (the repo map lives there), no `.claude/rules/`, nothing under `docs/`. If the task itself seems to require that, stop — it's the developer's call outside this workflow.
 - **Do NOT edit anything outside the plan's listed paths plus `<task_dir>/worker-log.md`.**
 - If the plan item is structurally impossible (file doesn't exist, conflict with current state) → stop, log blocker, ask developer.
 - Stop after writing the log and returning the pointer. No commentary.
@@ -118,6 +116,6 @@ Set Status to `blocked`, log in `Blockers encountered`, return summary:
 - A plan item conflicts with current code state.
 - An ambiguity the plan didn't resolve.
 - A test fails in a way suggesting the plan itself was wrong.
-- A pattern conflict between two rooms/references.
+- A pattern conflict between two plan-cited sources (files or rules).
 
 The orchestrator brings the blocker to the developer. You wait.
