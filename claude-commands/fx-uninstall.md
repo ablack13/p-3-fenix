@@ -161,7 +161,7 @@ After developer chooses option 1, **process in this order**:
 2. **Restore backups second.** For each `backup-move` entry: `mv _claude_backup/<to>` back to `<path>`. Order matters — destination paths (`CLAUDE.md`, `.claude/`) must already be free from step 1.
 3. **Restore legacy quarantine** (only if `rename-on-install` entries exist): read `CLAUDE.md.old`, strip header through `# IGNORE-FROM-HERE-DOWN`, write to `CLAUDE.md`, delete `.old`.
 4. **Strip reference-linker frontmatter** *(legacy 3.x manifests only)*. For each `reference-link`: read the reference file, strip the `---…---` block Fenix added, write back. Don't delete the file itself.
-5. **Clean up `_claude_backup/`.** After all `backup-move` restores succeed, delete `_claude_backup/IGNORE_THIS_FOLDER.md` and `_claude_backup/.claudeignore`. Then `rmdir _claude_backup/` (must be empty).
+5. **Clean up `_claude_backup/`.** After all `backup-move` restores succeed, delete `_claude_backup/IGNORE_THIS_FOLDER.md` and `_claude_backup/.claudeignore`. `<version>-upgrade/` archives (upgrade backups — after a 4.0.0 upgrade this includes the swept docs) are intentionally kept: leave the folder in place and note it in the report. Only `rmdir _claude_backup/` when it is actually empty.
 6. **Update manifest as we go** so partial uninstall can resume.
 7. **Last step:** delete `.fenix-manifest.json`.
 
@@ -174,7 +174,7 @@ Removed:                N files, K folders
 Restored from backup:   J files/folders (CLAUDE.md, .claude/, …)
 Frontmatter stripped:   M reference files
 
-_claude_backup/ deleted.
+_claude_backup/: deleted | kept (<version>-upgrade/ archives remain — delete manually when no longer needed)
 Manifest deleted.
 
 If you backed up content before uninstall, restore it now (e.g., git stash pop).

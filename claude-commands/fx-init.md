@@ -252,9 +252,13 @@ Backups: _claude_backup/<target_version>-upgrade/
 Recommended follow-ups:
   1. Review docs-meta/runbook.md and any *-rules.md files you had customized.
      Diff against _claude_backup/<target_version>-upgrade/ to see what was overwritten.
-  2. If CLAUDE.md is preserved, manually sync any wanted changes from the new template
-     (visible at https://github.com/ablack13/p-3-fenix/blob/main/templates/CLAUDE.md).
-  3. Run /clear to drop the old context. The next session will load the upgraded
+  2. If the upgrade replaced CLAUDE.md (the 4.0.0 upgrade does), copy your custom
+     sections back from _claude_backup/<target_version>-upgrade/CLAUDE.md, then run
+     /fx-init to generate the repo map. If it was preserved, sync wanted changes from
+     the new template.
+  3. Check the version line in docs/DISCLAIMER.md — it is user-owned, upgrades never
+     touch it, so its banner may still name the old version.
+  4. Run /clear to drop the old context. The next session will load the upgraded
      commands and agents.
 ```
 

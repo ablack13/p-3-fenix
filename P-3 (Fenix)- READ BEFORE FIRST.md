@@ -115,7 +115,7 @@ Manifest-driven removal of every file Fenix created.
 
 - Reads `.fenix-manifest.json`, walks entries in reverse order.
 - Removes Fenix-created files (commands, agents, rules, templates, `CLAUDE.md`).
-- Restores `_claude_backup/CLAUDE.md` and `_claude_backup/.claude/` to their original locations, then removes the empty backup folder.
+- Restores `_claude_backup/CLAUDE.md` and `_claude_backup/.claude/` to their original locations. The backup folder itself is removed only if empty — `<version>-upgrade/` archives (including the 4.0.0 docs sweep) are intentionally kept for manual recovery.
 - Warns about user content before deleting: edited `.claude/rules/` files, open tasks. Legacy 3.x manifests: stub-filled docs and Fenix-linked reference files are handled by their legacy branches.
 - Provides explicit instructions for git-stashing before uninstall if needed.
 
@@ -132,7 +132,7 @@ Every agent has a sibling `<name>-rules.md` file for editable behavior. Run `/fx
 #### `architect`
 - **Tools:** Read, Edit, Write, Grep, Glob, Bash.
 - **Writes to:** `<task_dir>/architect-plan.md` ONLY.
-- **Used by:** `/fx-task new` Phase 3.
+- **Used by:** `/fx-task new` — architecture phase.
 - Receives `map_sections`, `code_entry_points`, `module_scope`, `briefs`. Reads entry points, follows code on demand; treats map lines as hints and confirms them against code.
 - **Verifies developer-stated facts before pinning them in the plan** (versions, library availability, paths, API surfaces). Logs verifications in a "Verified facts" table; lists unverifiable claims under "Assumptions" with risk notes.
 
@@ -146,7 +146,7 @@ Every agent has a sibling `<name>-rules.md` file for editable behavior. Run `/fx
 #### `tester`
 - **Tools:** Read, Edit, Write, Grep, Glob, Bash.
 - **Writes to:** `<task_dir>/tester-review.md` ONLY.
-- **Used by:** `/fx-task new` Phase 5.
+- **Used by:** `/fx-task new` — review phase.
 - Compares plan vs. actual execution; pattern compliance is judged against the sources the plan's "Patterns to follow" table cites (files and rules). Flags scope creep, pattern violations, missing items.
 
 ---
@@ -245,7 +245,7 @@ Don't edit `_claude_backup/` manually — `/fx-uninstall` reads the manifest to 
 Reads `.fenix-manifest.json`, walks entries in reverse:
 1. Removes Fenix-created files and folders (including `.claude/rules/` files it created).
 2. Restores `_claude_backup/CLAUDE.md` and `_claude_backup/.claude/` to repo root.
-3. Deletes the now-empty `_claude_backup/` along with its disclaimer markers.
+3. Deletes `_claude_backup/`'s disclaimer markers, then the folder itself only if empty — `<version>-upgrade/` archives are kept for manual recovery.
 4. Deletes `.fenix-manifest.json`.
 
 (Legacy pre-3.0.0 installs that used the old `CLAUDE.md.old` quarantine flow are still handled, as are 3.x manifests with stub-fill / reference-link entries.)

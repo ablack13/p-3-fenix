@@ -37,7 +37,7 @@ The map below is the navigation index for this repo. Source code is the source o
 
 ### When you need X, look here
 
-<!-- Filled by /fx-init: task-type → paths. This section replaces the old task-router categories. -->
+<!-- Filled by /fx-init: task-type → paths. -->
 
 <!-- FENIX:MAP:END -->
 

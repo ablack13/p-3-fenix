@@ -69,7 +69,7 @@
   "notes": [
     "CLAUDE.md IS replaced in this upgrade (unlike 3.x upgrades) — v4's repo map and navigation rules live there, and the 3.x routing text would actively mislead the agent. The pre-upgrade copy lands in _claude_backup/4.0.0-upgrade/CLAUDE.md; copy your Stack / Local environment / custom sections back by hand, then run /fx-init to generate the map and re-fill placeholders.",
     "sweep_manifest_patterns walks the consumer repo's .fenix-manifest.json and moves every Fenix-recorded docs artifact (wings, rooms, drawers, _pending/_history, reference scaffolding) into _claude_backup/4.0.0-upgrade/ — auditor-filled prose is human-approved content and is archived, never hard-deleted. Hand-written files in reference/ are NOT in the manifest and stay in place; move anything still valuable into .claude/rules/ or the repo map, the kit no longer reads reference/.",
-    "docs/DISCLAIMER.md and docs/info.md are preserved unchanged (user-editable).",
+    "docs/DISCLAIMER.md and docs/info.md are preserved unchanged (user-editable). The DISCLAIMER post-bootstrap banner is user-owned and will keep saying 'P-3 (Fenix) v3.2.0 is loaded successfully' — update its version line by hand after the upgrade.",
     "After the upgrade, run /fx-init: it appends/refreshes the repo map in CLAUDE.md and scaffolds any missing rules files. Then run /fx-agent rules to see the editable rules.",
     "Upgrades from 3.0.0/3.1.0 must go through the 3.2.0 kit first — no direct JSON is shipped."
   ]
