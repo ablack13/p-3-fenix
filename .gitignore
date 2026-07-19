@@ -20,6 +20,9 @@ _claude_backup/
 # Per-user Claude Code settings (machine-local; never commit)
 .claude/settings.local.json
 
+# Internal next-version planning docs (local only)
+next_version/
+
 # Common deps
 node_modules/
 
