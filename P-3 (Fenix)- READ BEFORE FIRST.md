@@ -43,10 +43,10 @@ your-project/
 ├── tasks/                    ← file-based dev workflow artifacts
 │   └── <task_id>/
 │       ├── task.md           ← task metadata + navigation
-│       ├── architect-plan.md ← Phase 2 output
-│       ├── worker-log.md     ← Phase 3 output (live status)
-│       ├── tester-review.md  ← Phase 4 output
-│       └── outcome.md        ← Phase 5/6 result
+│       ├── architect-plan.md ← architecture phase output (the contract)
+│       ├── worker-log.md     ← implementation phase output (live status)
+│       ├── tester-review.md  ← review phase output
+│       └── outcome.md        ← final disposition
 └── docs-meta/                ← runbook + templates (operational reference)
 ```
 

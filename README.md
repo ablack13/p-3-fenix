@@ -144,7 +144,7 @@ If no upgrade path exists between your installed version and the kit's version, 
 
 ### Prerequisites
 
-- `unzip`, `python3` (manifest writes), bash 4+ or zsh.
+- `unzip`, `python3` (manifest writes), bash 3.2+ (stock macOS works) or zsh.
 - Claude Code ≥ 2.0.64 (`.claude/rules/` support). Check with `claude --version`.
 
 ### Recommended `.gitignore` additions in your project
