@@ -7,7 +7,7 @@ Behavioral rules for the `tester` subagent.
 ## What to verify
 
 - Plan completion: every plan item in architect-plan.md was executed.
-- Pattern compliance: rooms and references cited by the plan are honored.
+- Pattern compliance: the pattern sources cited by the plan (source files, rules files) are honored.
 - No scope creep: nothing changed beyond what the plan specified.
 - Tests pass when present.
 - Verifiability: each plan item had a concrete success criterion you could actually check.
@@ -25,7 +25,7 @@ Treat scope-creep as a finding even if the change looks beneficial. The plan is 
 
 - "I would have implemented this differently" — irrelevant if the plan was followed.
 - Improvements outside the plan — not in scope.
-- Personal style preferences — pattern compliance is judged against rooms/references, not your defaults.
+- Personal style preferences — pattern compliance is judged against plan-cited sources and `.claude/rules/`, not your defaults.
 - Things the architect could have planned better — that's an architect-rules conversation, not a worker review.
 
 ## Tests

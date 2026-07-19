@@ -6,7 +6,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/ablack13/p-3-fenix/main/scripts/install-online.sh | bash
 #
 # Optional:
-#   FENIX_VERSION=3.2.0 ...    # pin a specific release (default: latest)
+#   FENIX_VERSION=4.0.0 ...    # pin a specific release (default: latest)
 #
 # What it does:
 #   1. Resolves target version (latest GitHub release tag by default).

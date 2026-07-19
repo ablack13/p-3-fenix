@@ -25,10 +25,6 @@ modifying the structural agent definition.
 | architect          | .claude/agents/architect-rules.md                | Designs implementation plans (file-based, read-only on source) |
 | worker             | .claude/agents/worker-rules.md                   | Executes approved plans (only writer of project code) |
 | tester             | .claude/agents/tester-rules.md                   | Reviews worker output (file-based, read-only) |
-| module-auditor     | .claude/agents/module-auditor-rules.md           | Per-module audit: detects stubs, fills them, finds stale docs |
-| module-discoverer  | .claude/agents/module-discoverer-rules.md        | Per-module structure proposal for /fx-init |
-| freshness-scanner  | .claude/agents/freshness-scanner-rules.md        | Frontmatter staleness check |
-| reference-linker   | .claude/agents/reference-linker-rules.md         | Auto-link new files in reference/ |
 
 Edit any file with your editor of choice.
 Changes apply on the next subagent invocation — no restart.
@@ -44,7 +40,7 @@ To see structural definition (tools, output format), open <name>.md (without -ru
 
 List all agents with tool access.
 
-1. Discover `.claude/agents/*.md` excluding `*-rules.md` and `_topology.md`.
+1. Discover `.claude/agents/*.md` excluding `*-rules.md`.
 2. For each, parse frontmatter to extract name, tools, description.
 3. Print as a table.
 

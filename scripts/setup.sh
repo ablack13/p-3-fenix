@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# scripts/setup.sh — install P-3 (Fenix) 3.2.0 kit into the current repo
+# scripts/setup.sh — install P-3 (Fenix) 4.0.0 kit into the current repo
 #
 # Usage:
-#   ./scripts/setup.sh                          # uses ~/Downloads/p3-fenix-3.2.0.zip
+#   ./scripts/setup.sh                          # uses ~/Downloads/p3-fenix-4.0.0.zip
 #   ./scripts/setup.sh /path/to/kit.zip         # explicit zip path
 #
 # Idempotent: safe to re-run. Never overwrites existing files.
@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-FENIX_VERSION="3.2.0"
+FENIX_VERSION="4.0.0"
 KIT_NAME="p3-fenix-${FENIX_VERSION}"
 
 # --- args & defaults --------------------------------------------------------
@@ -51,7 +51,7 @@ section() { printf '\n%s%s%s\n' "$BOLD" "$1" "$RESET"; }
 
 # Manifest is a flat JSON file. We use simple shell-side appends because
 # we don't want a jq dependency. The format:
-# {"fenix_version":"3.2.0","installed_at":"...","actions":[...]}
+# {"fenix_version":"4.0.0","installed_at":"...","actions":[...]}
 # Action types: create, create-dir, modify, backup-move,
 #               upgrade-replace, upgrade-remove (added in 3.1.0),
 #               rename-on-install (legacy, no longer emitted).
@@ -132,7 +132,7 @@ else
 fi
 
 if [[ ! -d "$REPO_ROOT/.git" ]] && ! git rev-parse --git-dir >/dev/null 2>&1; then
-  warn "Not inside a git repo. Continuing anyway, but you'll want one for freshness checks."
+  warn "Not inside a git repo. Continuing anyway, but /fx-uninstall's user-edit detection needs git history."
 else
   ok "Git repo detected"
 fi
@@ -267,6 +267,7 @@ kit_source_for() {
   case "$rel" in
     .claude/agents/*)      printf '%s/claude-agents/%s' "$KIT_DIR" "${rel#.claude/agents/}" ;;
     .claude/commands/*)    printf '%s/claude-commands/%s' "$KIT_DIR" "${rel#.claude/commands/}" ;;
+    .claude/rules/*)       printf '%s/templates/rules-%s' "$KIT_DIR" "${rel#.claude/rules/}" ;;
     docs-meta/runbook.md)  printf '%s/runbook.md' "$KIT_DIR" ;;
     docs-meta/templates/*) printf '%s/templates/%s' "$KIT_DIR" "${rel#docs-meta/templates/}" ;;
     docs/*)                printf '%s/templates/%s' "$KIT_DIR" "${rel#docs/}" ;;
@@ -313,6 +314,70 @@ remove_with_backup() {
   manifest_append "upgrade-remove" "$rel" "\"backup_path\": \"_claude_backup/$backup_subdir/$rel\""
 }
 
+# Sweep consumer-generated docs artifacts recorded in the manifest (4.0.0 upgrade).
+# Patterns come from the upgrade JSON's sweep_manifest_patterns[]. Every matching
+# manifest-recorded path that still exists on disk is moved to _claude_backup/ —
+# never hard-deleted, because auditor-filled wings hold human-approved prose.
+# Only paths Fenix itself recorded (create / create-dir / stub-fill) are touched;
+# user files (e.g. hand-written reference/*.md) are not in those entries and stay.
+apply_manifest_sweep() {
+  local upgrade_file="$1"
+  local backup_subdir="$2"
+
+  local sweep_list
+  sweep_list="$(
+    FENIX_SW_FILE="$upgrade_file" FENIX_SW_MANIFEST="$MANIFEST_PATH" python3 - <<'PYEOF'
+import fnmatch, json, os
+
+with open(os.environ["FENIX_SW_FILE"]) as f:
+    patterns = [p.rstrip("/") for p in json.load(f).get("sweep_manifest_patterns", [])]
+if patterns:
+    with open(os.environ["FENIX_SW_MANIFEST"]) as f:
+        actions = json.load(f).get("actions", [])
+    seen = set()
+    for a in actions:
+        p = (a.get("path") or "").rstrip("/")
+        if not p or p in seen or a.get("action") not in ("create", "create-dir", "stub-fill"):
+            continue
+        if any(fnmatch.fnmatch(p, pat) for pat in patterns):
+            seen.add(p)
+            kind = "D" if (a.get("action") == "create-dir" or os.path.isdir(p)) else "F"
+            print(kind + "\t" + p)
+PYEOF
+  )"
+
+  [[ -z "$sweep_list" ]] && return 0
+
+  section "Sweeping generated docs (backed up, not deleted)"
+
+  local kind rel
+  local -a sweep_dirs=()
+  while IFS=$'\t' read -r kind rel; do
+    [[ -z "$rel" ]] && continue
+    if [[ "$kind" == "D" ]]; then
+      sweep_dirs+=("$rel")
+    else
+      remove_with_backup "$rel" "$backup_subdir"
+    fi
+  done <<< "$sweep_list"
+
+  # Prune swept directories bottom-up once their files are in backup. A dir that
+  # still holds user files (untracked by the manifest) is left in place.
+  # (${#arr[@]} guard: empty-array expansion trips `set -u` on macOS bash 3.2.)
+  if (( ${#sweep_dirs[@]} > 0 )); then
+    local d
+    for d in "${sweep_dirs[@]}"; do
+      [[ -d "$REPO_ROOT/$d" ]] || continue
+      find "$REPO_ROOT/$d" -depth -type d -empty -delete 2>/dev/null || true
+      if [[ ! -d "$REPO_ROOT/$d" ]]; then
+        ok "Pruned empty dir $d/"
+      else
+        warn "$d/ kept — contains files the manifest doesn't own"
+      fi
+    done
+  fi
+}
+
 apply_upgrade() {
   local upgrade_file="$1"
   local to_version
@@ -325,6 +390,8 @@ apply_upgrade() {
 
   # replace[]
   local rel src
+  local project_name
+  project_name="$(basename "$REPO_ROOT")"
   while IFS= read -r rel; do
     [[ -z "$rel" ]] && continue
     if ! src="$(kit_source_for "$rel")"; then
@@ -335,6 +402,11 @@ apply_upgrade() {
       warn "Source missing in kit for $rel ($src) — skipping"
       continue
     fi
+    if [[ "$rel" == "CLAUDE.md" ]]; then
+      # The template carries {{PROJECT_NAME}}; render it like a fresh install does.
+      sed "s/{{PROJECT_NAME}}/$project_name/g" "$src" > "$TMP_DIR/CLAUDE.md.rendered"
+      src="$TMP_DIR/CLAUDE.md.rendered"
+    fi
     replace_with_backup "$src" "$rel" "$backup_subdir"
   done < <(FENIX_UP_FILE="$upgrade_file" python3 -c 'import json,os; print("\n".join(json.load(open(os.environ["FENIX_UP_FILE"])).get("replace", [])))')
 
@@ -343,6 +415,9 @@ apply_upgrade() {
     [[ -z "$rel" ]] && continue
     remove_with_backup "$rel" "$backup_subdir"
   done < <(FENIX_UP_FILE="$upgrade_file" python3 -c 'import json,os; print("\n".join(json.load(open(os.environ["FENIX_UP_FILE"])).get("remove", [])))')
+
+  # sweep_manifest_patterns[] — consumer-generated docs recorded in the manifest
+  apply_manifest_sweep "$upgrade_file" "$backup_subdir"
 
   # create_if_missing[] — handled by the normal copy_if_missing flow that
   # runs after this function, so we don't repeat it here. The normal flow
@@ -415,12 +490,10 @@ for dir in \
   "$REPO_ROOT/.claude" \
   "$REPO_ROOT/.claude/commands" \
   "$REPO_ROOT/.claude/agents" \
+  "$REPO_ROOT/.claude/rules" \
   "$REPO_ROOT/docs" \
-  "$REPO_ROOT/docs/_pending" \
-  "$REPO_ROOT/docs/_history" \
   "$REPO_ROOT/docs-meta" \
   "$REPO_ROOT/docs-meta/templates" \
-  "$REPO_ROOT/reference" \
   "$REPO_ROOT/tasks"
 do
   if [[ -d "$dir" ]]; then
@@ -439,7 +512,6 @@ section "Installing slash commands"
 
 copy_if_missing "$KIT_DIR/claude-commands/fx-init.md"      "$REPO_ROOT/.claude/commands/fx-init.md"
 copy_if_missing "$KIT_DIR/claude-commands/fx-info.md"      "$REPO_ROOT/.claude/commands/fx-info.md"
-copy_if_missing "$KIT_DIR/claude-commands/fx-doc.md"       "$REPO_ROOT/.claude/commands/fx-doc.md"
 copy_if_missing "$KIT_DIR/claude-commands/fx-task.md"      "$REPO_ROOT/.claude/commands/fx-task.md"
 copy_if_missing "$KIT_DIR/claude-commands/fx-agent.md"     "$REPO_ROOT/.claude/commands/fx-agent.md"
 copy_if_missing "$KIT_DIR/claude-commands/fx-uninstall.md" "$REPO_ROOT/.claude/commands/fx-uninstall.md"
@@ -447,15 +519,6 @@ copy_if_missing "$KIT_DIR/claude-commands/fx-uninstall.md" "$REPO_ROOT/.claude/c
 # --- agents and rules ------------------------------------------------------
 
 section "Installing agents and rules"
-
-# Doc maintenance agents
-copy_if_missing "$KIT_DIR/claude-agents/module-auditor.md"          "$REPO_ROOT/.claude/agents/module-auditor.md"
-copy_if_missing "$KIT_DIR/claude-agents/module-auditor-rules.md"    "$REPO_ROOT/.claude/agents/module-auditor-rules.md"
-copy_if_missing "$KIT_DIR/claude-agents/module-discoverer.md"       "$REPO_ROOT/.claude/agents/module-discoverer.md"
-copy_if_missing "$KIT_DIR/claude-agents/module-discoverer-rules.md" "$REPO_ROOT/.claude/agents/module-discoverer-rules.md"
-copy_if_missing "$KIT_DIR/claude-agents/freshness-scanner.md"       "$REPO_ROOT/.claude/agents/freshness-scanner.md"
-copy_if_missing "$KIT_DIR/claude-agents/freshness-scanner-rules.md" "$REPO_ROOT/.claude/agents/freshness-scanner-rules.md"
-copy_if_missing "$KIT_DIR/claude-agents/_topology.md"               "$REPO_ROOT/.claude/agents/_topology.md"
 
 # Dev-team agents
 copy_if_missing "$KIT_DIR/claude-agents/architect.md"               "$REPO_ROOT/.claude/agents/architect.md"
@@ -465,16 +528,20 @@ copy_if_missing "$KIT_DIR/claude-agents/worker-rules.md"            "$REPO_ROOT/
 copy_if_missing "$KIT_DIR/claude-agents/tester.md"                  "$REPO_ROOT/.claude/agents/tester.md"
 copy_if_missing "$KIT_DIR/claude-agents/tester-rules.md"            "$REPO_ROOT/.claude/agents/tester-rules.md"
 
-# Reference linker
-copy_if_missing "$KIT_DIR/claude-agents/reference-linker.md"        "$REPO_ROOT/.claude/agents/reference-linker.md"
-copy_if_missing "$KIT_DIR/claude-agents/reference-linker-rules.md"  "$REPO_ROOT/.claude/agents/reference-linker-rules.md"
+# --- always-on rules -------------------------------------------------------
+#
+# No paths: frontmatter — these load at session start. Per-module (paths:-scoped)
+# rules are generated later by /fx-init, not installed here.
+
+section "Installing rules"
+
+copy_if_missing "$KIT_DIR/templates/rules-git-workflow.md"      "$REPO_ROOT/.claude/rules/git-workflow.md"
+copy_if_missing "$KIT_DIR/templates/rules-fenix-conventions.md" "$REPO_ROOT/.claude/rules/fenix-conventions.md"
 
 # --- docs/ shared files ----------------------------------------------------
 
 section "Installing shared docs"
 
-copy_if_missing "$KIT_DIR/templates/STYLE.md"        "$REPO_ROOT/docs/STYLE.md"
-copy_if_missing "$KIT_DIR/templates/task-router.md"  "$REPO_ROOT/docs/task-router.md"
 copy_if_missing "$KIT_DIR/templates/info.md"         "$REPO_ROOT/docs/info.md"
 copy_if_missing "$KIT_DIR/templates/DISCLAIMER.md"   "$REPO_ROOT/docs/DISCLAIMER.md"
 
@@ -501,30 +568,6 @@ fi
 
 copy_if_missing "$KIT_DIR/P-3 (Fenix)- READ BEFORE FIRST.md" "$REPO_ROOT/P-3 (Fenix)- READ BEFORE FIRST.md"
 
-# --- reference/ scaffolding ------------------------------------------------
-
-section "Installing reference/ scaffolding"
-
-REF_README="$REPO_ROOT/reference/README.md"
-if [[ -e "$REF_README" ]]; then
-  skip "$REF_README"
-else
-  cat > "$REF_README" <<'REFEOF'
-# Reference docs
-
-Cross-cutting documentation that applies to multiple wings or the project as a whole.
-
-Drop a `.md` file here (or in a subfolder like `reference/decisions/`).
-On the next `/fx-doc update`, the `reference-linker` subagent will propose
-frontmatter and index entries for unlinked files. Approve, edit, or reject
-the proposal during the update's plan phase.
-
-File template: see `docs-meta/templates/reference.md`.
-REFEOF
-  ok "$REF_README"
-  manifest_append "create" "reference/README.md"
-fi
-
 # --- tasks/ scaffolding ----------------------------------------------------
 
 section "Installing tasks/ scaffolding"
@@ -543,17 +586,14 @@ fi
 section "Installing reference material (docs-meta/)"
 
 copy_if_missing "$KIT_DIR/runbook.md"                     "$REPO_ROOT/docs-meta/runbook.md"
-copy_if_missing "$KIT_DIR/templates/hint_index_map.md"    "$REPO_ROOT/docs-meta/templates/hint_index_map.md"
-copy_if_missing "$KIT_DIR/templates/wing-README.md"       "$REPO_ROOT/docs-meta/templates/wing-README.md"
-copy_if_missing "$KIT_DIR/templates/room.md"              "$REPO_ROOT/docs-meta/templates/room.md"
-copy_if_missing "$KIT_DIR/templates/drawer.md"            "$REPO_ROOT/docs-meta/templates/drawer.md"
-copy_if_missing "$KIT_DIR/templates/reference.md"         "$REPO_ROOT/docs-meta/templates/reference.md"
+copy_if_missing "$KIT_DIR/templates/rules-git-workflow.md"      "$REPO_ROOT/docs-meta/templates/rules-git-workflow.md"
+copy_if_missing "$KIT_DIR/templates/rules-fenix-conventions.md" "$REPO_ROOT/docs-meta/templates/rules-fenix-conventions.md"
+copy_if_missing "$KIT_DIR/templates/rules-module.md"            "$REPO_ROOT/docs-meta/templates/rules-module.md"
 copy_if_missing "$KIT_DIR/templates/task.md"              "$REPO_ROOT/docs-meta/templates/task.md"
 copy_if_missing "$KIT_DIR/templates/architect-plan.md"    "$REPO_ROOT/docs-meta/templates/architect-plan.md"
 copy_if_missing "$KIT_DIR/templates/worker-log.md"        "$REPO_ROOT/docs-meta/templates/worker-log.md"
 copy_if_missing "$KIT_DIR/templates/tester-review.md"     "$REPO_ROOT/docs-meta/templates/tester-review.md"
 copy_if_missing "$KIT_DIR/templates/outcome.md"           "$REPO_ROOT/docs-meta/templates/outcome.md"
-copy_if_missing "$KIT_DIR/templates/doc-audit.md"         "$REPO_ROOT/docs-meta/templates/doc-audit.md"
 
 # --- summary ---------------------------------------------------------------
 
@@ -570,20 +610,15 @@ Read first:
 
 Next steps:
   1. Open Claude Code in this repo.
-  2. Run ${BOLD}/fx-init${RESET}. It scaffolds wings (with stubs intentionally),
-     drafts info.md, populates CLAUDE.md, generates task-router.md.
-  3. Run ${BOLD}/fx-doc audit${RESET} (then update). The auditor reads source code
-     and fills the stubs with real content for your review.
-  4. Run ${BOLD}/fx-info${RESET} anytime to confirm status.
+  2. Run ${BOLD}/fx-init${RESET}. It generates the repo map inside CLAUDE.md,
+     drafts info.md, and adds per-module rules (always-on rules are already installed).
+  3. Run ${BOLD}/fx-info${RESET} anytime to confirm status.
 
 Day-to-day commands:
   ${BOLD}/fx-task <description>${RESET}        Explicit routing — see classification.
   ${BOLD}/fx-task new <description>${RESET}    Dev workflow (architect → worker → tester),
                                 file-based artifacts in ${DIM}tasks/<task_id>/${RESET}.
                                 Add ${DIM}briefs:<path>${RESET} for external context.
-  ${BOLD}/fx-doc audit${RESET}                  Phase 1 audit — detects stubs + staleness.
-  ${BOLD}/fx-doc update${RESET}                 Full sweep — fills stubs after approval.
-  ${BOLD}/fx-doc freshness${RESET}              Global staleness check.
   ${BOLD}/fx-agent rules${RESET}                List agent rules files for editing.
   ${BOLD}/fx-uninstall${RESET}                  Remove all Fenix files (manifest-driven).
 
@@ -607,10 +642,6 @@ cat <<EOF
 Manifest:
   ${DIM}.fenix-manifest.json${RESET} tracks every file Fenix created.
   Keep it committed for /fx-uninstall to work later.
-
-Optional cleanup:
-  - .gitignore ${DIM}docs/_pending/${RESET} to keep audit drafts out of git.
-  - .gitignore ${DIM}docs-meta/.fenix-cache.json${RESET} — derived /fx-doc cache, rebuilt on demand.
 EOF
 
 # Detect distribution artifacts inside the repo root and print a copy-paste
@@ -625,6 +656,8 @@ fi
 
 if (( ${#CLEANUP_TARGETS[@]} > 0 )); then
 cat <<EOF
+
+Optional cleanup:
   - Delete the distribution artifacts now that install is done:
       ${BOLD}rm -rf ${CLEANUP_TARGETS[*]}${RESET}
 EOF

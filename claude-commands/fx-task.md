@@ -1,11 +1,11 @@
-# /fx-task — Task routing and dev workflow
+# /fx-task — Task navigation and dev workflow
 
 $ARGUMENTS
 
 Two modes based on the first word:
 
 - **`new <description> [briefs:<path>]`** — file-based dev-team workflow.
-- **`<description>` (anything else)** — explicit task routing with visible classification, then proceed via main agent.
+- **`<description>` (anything else)** — explicit navigation with visible classification, then proceed via main agent.
 
 ---
 
@@ -25,26 +25,26 @@ The task description is everything after `new`. Optional `briefs:<path>` (folder
    - All phase rows in the status table set to `pending`.
 4. Add manifest entry: `{action: "create-task", task_id, path: "tasks/<task_id>/", timestamp: "..."}`.
 
-### Phase 1 — Routing
+### Phase 1 — Navigation
 
-1. Read `docs/task-router.md`. If empty or missing, abort with "run /fx-init first".
-2. Classify the description against categories. Pick one or more.
-3. Identify wing scope. If ambiguous, list candidates and ask the developer once before proceeding. Don't guess.
-4. Identify reference docs the router associates with the matched categories.
+The repo map lives in `CLAUDE.md` (between the `FENIX:MAP` markers) and is already in context — no file read needed.
+
+1. If the map sections are empty (fresh install, `/fx-init` never ran), abort with "run /fx-init first".
+2. Match the description against `When you need X, look here` and `Entry points`. Pick the relevant lines.
+3. Identify module scope from the map's `Modules` list. If ambiguous, list candidates and ask the developer once before proceeding. Don't guess.
+4. Identify code entry points — the paths the matched map lines point to.
 5. Identify briefs (from `briefs:<path>` arg or inline mentions).
-6. Update `tasks/<task_id>/task.md` with the Routing section filled in.
+6. Update `tasks/<task_id>/task.md` with the Navigation section filled in.
 7. Set task.md frontmatter `phase: architect`.
 
-Print routing summary referencing the task file:
+Print navigation summary referencing the task file:
 
 ```
 Task created: tasks/<task_id>/task.md
 
-Categories matched: <list>
-Wing scope: <list>
-Rooms loaded: <list>
-Wing READMEs: <list>
-Reference docs: <list>
+Map sections matched: <list of matched "When you need X" / entry-point lines>
+Module scope: <list>
+Code entry points: <paths>
 Briefs: <path or "none">
 ```
 
@@ -56,9 +56,9 @@ Spawn the **`architect`** subagent via Task with `subagent_type=architect`. Pass
 {
   task_dir: "tasks/<task_id>/",
   task: "<description>",
-  matched_rooms: [...],
-  wing_scope: [...],
-  reference_docs: [...],
+  map_sections: [<matched map lines, verbatim>],
+  code_entry_points: [...],
+  module_scope: [...],
   briefs: [...]
 }
 ```
@@ -99,8 +99,8 @@ Spawn **`worker`** via Task with `subagent_type=worker`. Pass:
 {
   task_dir: "tasks/<task_id>/",
   plan_path: "tasks/<task_id>/architect-plan.md",
-  matched_rooms: [...],
-  reference_docs: [...],
+  map_sections: [...],
+  code_entry_points: [...],
   briefs: [...]
 }
 ```
@@ -138,11 +138,11 @@ Spawn **`tester`** via Task with `subagent_type=tester`. Pass:
 {
   task_dir: "tasks/<task_id>/",
   plan_path: "tasks/<task_id>/architect-plan.md",
-  log_path: "tasks/<task_id>/worker-log.md",
-  matched_rooms: [...],
-  reference_docs: [...]
+  log_path: "tasks/<task_id>/worker-log.md"
 }
 ```
+
+The plan's `Patterns to follow` table carries the pattern sources — the tester reads them from the plan file.
 
 The tester writes to `tasks/<task_id>/tester-review.md`. Returns verdict and brief summary.
 
@@ -159,19 +159,16 @@ Review at: tasks/<task_id>/tester-review.md
 
 Disposition options:
 
-  1. Close clean — accept all findings, no further action.
-  2. Close with doc audit — accept, then run task-scoped doc audit.
-  3. Re-dispatch worker — open new worker phase with tester findings as input.
-  4. Cancel — revert (developer must run git operations).
+  1. Close — accept findings as noted, no further action.
+  2. Re-dispatch worker — open new worker phase with tester findings as input.
+  3. Cancel — revert (developer must run git operations).
 
 Recommendation: <option N> based on <reasoning>.
 ```
 
 Recommendation logic:
-- Worker touched files in modules with existing wings → recommend option 2.
-- Worker touched only build configs / undocumented areas / pure refactor → recommend option 1.
-- Tester flagged pattern violations against rooms/references → strongly recommend option 2.
-- Verdict is `major-issues` or `blocked` → recommend option 3 unless developer disagrees.
+- Verdict `pass` or `minor-issues` the developer can live with → recommend option 1.
+- Verdict `major-issues` or `blocked` → recommend option 2 unless developer disagrees.
 
 ### Phase 6 — Outcome (always runs)
 
@@ -187,33 +184,9 @@ After developer chose disposition:
    - `status: closed`.
    - `phase: closed`.
 3. Update task.md phase status table — fill all completed phases.
+4. **Map-refresh check:** if the worker created or deleted a module, moved an entry point, or changed the structure the repo map describes — note it in outcome.md `Follow-up items` and include the hint in the final summary.
 
-### Phase 7 — Doc audit (only if option 2 was chosen)
-
-If developer chose option 2 in Phase 5:
-
-1. Read `worker-log.md` "Files actually touched". Group by module.
-2. For each affected module, spawn `module-auditor` via Task with:
-   ```
-   {
-     module_name: <name>,
-     module_path: <path>,
-     proposal_path: "tasks/<task_id>/doc-audit-proposals/<module-name>.md",
-     task_context: {
-       architect_plan_path: "tasks/<task_id>/architect-plan.md",
-       worker_log_path: "tasks/<task_id>/worker-log.md"
-     }
-   }
-   ```
-   Note: NO `BASE_REF`/`HEAD_REF` — this is task-scoped, not git-diff-driven. Auditor uses task_context to find what changed.
-
-3. Optionally spawn `freshness-scanner` scoped to the touched wings (skip global scan).
-
-4. Synthesize all auditor proposals into `tasks/<task_id>/doc-audit.md` with the structure from `docs-meta/templates/doc-audit.md`.
-
-5. Update task.md frontmatter `doc_audit: complete`. Update outcome.md to mention the audit was run.
-
-6. Print final summary:
+Print final summary:
 
 ```
 Task closed: tasks/<task_id>/
@@ -223,58 +196,39 @@ Phase summary:
   Worker log           ✓ (<N> items done)
   Tester review        ✓ (<verdict>)
   Disposition          ✓ (<chosen option>)
-  Doc audit            ✓ (<N> stubs found, <K> stale flagged)
 
-Doc audit at: tasks/<task_id>/doc-audit.md
-
-Stub-fills and stale-doc updates are NOT applied yet.
-Run /fx-doc update to apply with full Phase 2 review.
-
-Next: task is closed. Run /clear to drop this task's context and start fresh.
-```
-
-If option 1 was chosen, skip Phase 7. Print:
-
-```
-Task closed: tasks/<task_id>/
-
-Phase summary:
-  Architect plan       ✓ (approved)
-  Worker log           ✓ (<N> items done)
-  Tester review        ✓ (<verdict>)
-  Disposition          ✓ (close clean)
-  Doc audit            ↷ skipped
+<if structure changed:>
+⚠ This task changed repo structure the map describes.
+Run /fx-init to refresh the repo map in CLAUDE.md.
 
 Next: task is closed. Run /clear to drop this task's context and start fresh.
 ```
 
 ---
 
-## Mode 2 — `<description>` (explicit routing only)
+## Mode 2 — `<description>` (explicit navigation only)
 
-Used when the developer wants to see how the task router classifies a request without invoking the dev-team workflow.
+Used when the developer wants to see how a request maps onto the repo before normal execution.
 
-1. Read `docs/task-router.md`. If missing or empty, direct user to `/fx-init` and stop.
-2. Classify $ARGUMENTS. Pick one or more categories.
-3. Identify wing scope. Ask if ambiguous.
+1. If the repo map in `CLAUDE.md` is empty (markers with no content), direct user to `/fx-init` and stop.
+2. Match $ARGUMENTS against the map. Pick relevant lines.
+3. Identify module scope. Ask if ambiguous.
 4. Print:
 
 ```
 Task: $ARGUMENTS
 
-Categories matched: <list>
-Wing scope: <list>
-Rooms to load: <list>
-Wing READMEs to load: <list>
-Reference docs: <list>
+Map sections matched: <list>
+Module scope: <list>
+Code entry points to open: <paths>
 
 Plus: docs/info.md (if not already read this session)
 ```
 
 5. Wait briefly for override.
-6. Read matched files, form a plan, present, proceed after approval.
+6. Read the entry points, follow code on demand, form a plan, present, proceed after approval.
 
-This mode does NOT invoke architect/worker/tester. Routing preview + normal task execution.
+This mode does NOT invoke architect/worker/tester. Navigation preview + normal task execution.
 
 ---
 
@@ -284,7 +238,7 @@ Print:
 
 ```
 Usage:
-  /fx-task <description>             Explicit routing — see classification, then form a plan.
+  /fx-task <description>             Explicit navigation — see classification, then form a plan.
   /fx-task new <description>         Dev-team workflow — architect → worker → tester (file-based).
 
 Examples:
@@ -302,6 +256,6 @@ Stop.
 
 - Mode 1 is file-based throughout. Every agent writes to `tasks/<task_id>/`. Chat output is summary pointers.
 - Never auto-accept tester verdicts. Disposition is always developer-decided.
-- If `docs/task-router.md` is empty (no categories), stop and direct to `/fx-init`.
+- If the repo map is empty, stop and direct to `/fx-init`.
 - Even small tasks go through architect → worker → tester in mode 1. The discipline is the value.
-- Doc audit at task close is OPT-IN (Phase 5 disposition choice). It's not automatic.
+- Nobody in this workflow edits `CLAUDE.md`, `.claude/rules/`, or `docs/` — map refreshes are `/fx-init`'s job, suggested at close when structure changed.

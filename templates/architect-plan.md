@@ -8,15 +8,15 @@ status: drafting | proposed | approved | rejected | superseded
 
 # Architect plan: <one-line task summary>
 
-## Wing scope
+## Module scope
 
-<wing-1>, <wing-2>
+<module-1>, <module-2>
 
 ## Sources of truth consulted
 
-- Rooms: [list with paths]
 - Briefs: [list with paths, or "none"]
-- References: [list with paths, or "none"]
+- Code entry points: [list with paths]
+- Source files read: [list with paths]
 
 ## Verified facts
 
@@ -50,7 +50,7 @@ status: drafting | proposed | approved | rejected | superseded
 
 ## Patterns to follow
 
-| Pattern | Source room/reference | Application |
+| Pattern | Source (file / rule) | Application |
 |---|---|---|
 | <name> | `<path>` | <how it applies> |
 

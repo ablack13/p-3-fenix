@@ -16,13 +16,11 @@ Before processing the input, read `.claude/agents/tester-rules.md`. Apply both d
 
 ---
 
-## wings/rooms/drawers topology — shared vocabulary
+## What you compare against
 
-You compare actual code changes against:
-
-- **Rooms** the plan cited — for pattern compliance.
-- **Reference docs** the plan cited — for cross-cutting concerns.
-- **The architect's plan** — for completeness.
+- **The architect's plan** — for completeness. Its `Patterns to follow` table lists the pattern sources (source files, rules files).
+- **Those pattern sources** — for compliance.
+- **`.claude/rules/`** — always-on and path-scoped rules relevant to the touched files.
 - **The worker's log** — for what was actually done vs intended.
 
 ---
@@ -32,8 +30,8 @@ You compare actual code changes against:
 - `task_dir` — path to the task folder.
 - `plan_path` — path to `<task_dir>/architect-plan.md`.
 - `log_path` — path to `<task_dir>/worker-log.md`.
-- `matched_rooms` — rooms cited as pattern sources.
-- `reference_docs` — references cited.
+
+The plan's `Patterns to follow` table carries the pattern sources — read them from the plan, no separate list is passed.
 
 ## What to do — in order
 
@@ -65,7 +63,7 @@ Walk the architect plan's `Files to create / modify / delete` rows. For each:
 - Verify the actual changes match the architect's intent.
 - Note deviations.
 
-Walk the rooms and references the plan cited. For each pattern:
+Walk the pattern sources the plan's `Patterns to follow` table cites (source files, rules files). For each pattern:
 - Verify the worker followed it.
 - Note violations.
 
@@ -120,6 +118,6 @@ Read the review for full details.
 
 - Read-only on source. Write ONLY to `<task_dir>/tester-review.md`.
 - Compare against the plan, not against your opinions of how it could be better. Don't suggest improvements outside the plan's scope.
-- Pattern compliance judged against rooms/references the plan cited, not against your training data.
+- Pattern compliance judged against the pattern sources the plan cited, not against your training data.
 - Be specific in findings: file paths and line numbers, not vague descriptions.
 - Stop after writing the review and returning the pointer.

@@ -1,29 +1,116 @@
-# Docs Runbook — P-3 (Fenix) 3.2.0
+# Runbook — P-3 (Fenix) 4.0.0
 
 Codename: **Fenix**
 
-Single self-contained runbook. Paste the whole file into Claude Code after a multi-module change has landed, or trigger specific commands (`/init`, `/info`) when needed.
-
----
-
-## Before you post — fill these
-
-- `BASE_REF` = <git ref before the change — tag, branch, or `main~N`>
-- `HEAD_REF` = <usually `HEAD`>
-- `INDEX_FILE` = `docs/hint_index_map.md`
-- `INFO_FILE` = `docs/info.md`
+Single self-contained operational reference. Installed into consumer repos as `docs-meta/runbook.md`. The slash commands (`/fx-init`, `/fx-info`, `/fx-task`) carry their own instructions — this file is the background: what the layers are, why they're shaped this way, and how to verify them on your CLI version.
 
 ---
 
 ## Mission
 
-Maintain project documentation in wings/rooms/drawers decentralized topology. Three top-level operations:
+Keep Claude Code effective on a multi-module repo **without a maintained docs layer**. Code is the source of truth. The kit maintains three context layers and one workflow:
 
-- **`/init`** — bootstrap structure when missing or partial. Idempotent.
-- **`/info`** — read-only status check.
-- **Audit + update sweep** — the default flow when you paste this runbook after a change.
+- **Repo map** — a navigation index inside root `CLAUDE.md`, between `FENIX:MAP:START/END` markers. Generated and refreshed by `/fx-init`.
+- **Rules** — `.claude/rules/*.md`. Always-on rules (no `paths:`) for git and kit conventions; `paths:`-scoped rules per module.
+- **info.md** — `docs/info.md`, user-owned authoritative context (toolchain, conventions, quirks).
+- **Dev workflow** — architect → worker → tester via `/fx-task new`, all artifacts on disk in `tasks/<task_id>/`.
 
-All three share the same three-phase shape: Discover/Audit → Plan → Execute. Hard stop between phases for human review.
+---
+
+## What changed in 4.0.0
+
+v4 **removes** the wings/rooms/drawers documentation system — the per-module `docs/` trees, `/fx-doc`, the module-auditor/module-discoverer/freshness-scanner/reference-linker agents, the hint index, the task router, and the doc cache.
+
+Rationale, in one paragraph: generated prose docs had no privileged status in Claude Code's context. They entered context only when the routing happy path explicitly read them, went stale the moment sources moved (hence the whole freshness/auditor machinery), and were bypassed by ad-hoc requests and post-compaction sessions. The two layers that *are* privileged — root `CLAUDE.md` (re-read after compaction) and `.claude/rules/` (always-on when unscoped) — now carry everything: the map lives in `CLAUDE.md`, git conventions live in an always-on rules file so they apply even to requests that never read a source file ("prepare a PR description"). Agents read code on demand; nothing needs re-auditing because nothing duplicates the code.
+
+---
+
+## Context layers — where things load and survive
+
+| Layer | Loads | Compaction behavior |
+|---|---|---|
+| Root `CLAUDE.md` (incl. repo map) | Session start | Re-read from disk after compaction — survives |
+| `.claude/rules/*.md` without `paths:` | Session start | Loads like CLAUDE.md; verify after compaction via `/context` |
+| `.claude/rules/*.md` with `paths:` | When a file matching the glob is READ | Summarized away; reloads on next matching read |
+| `docs/info.md` | Read once per session (navigation rule) | Lost until re-read |
+| Source code | On demand | Re-read as needed |
+
+Design consequences:
+
+- Anything that must **never** be lost goes in `CLAUDE.md` (the map, the navigation rule) or a hook — not in a read-once file.
+- Git/PR conventions stay **unscoped** (`git-workflow.md`, `fenix-conventions.md`). Adding `paths:` to them is how they silently stop applying to promptless requests.
+- Per-module invariants go in `paths:`-scoped rules — they cost nothing until the module's files are read.
+
+---
+
+## Verify rules mechanics on your CLI version
+
+`.claude/rules/` requires **Claude Code ≥ 2.0.64** (`claude --version`). Two live checks before trusting the mechanics, plus one known limitation:
+
+1. **Read-vs-write trigger.** Path-scoped rules historically loaded on file READ but not on WRITE/creation of new matching files (anthropics/claude-code#23478 — now closed, possibly fixed). Test: create a file matching one of your `paths:` globs, then run `/context` and check whether the rule loaded. Only if the bug reproduces: keep file-creation conventions in an unscoped rule or the map, or add a `PostToolUse` hook that forces a read after writes. Don't build the workaround pre-emptively.
+2. **Compaction survival.** After a `/compact` (or an auto-compaction), run `/context` and confirm the always-on rules and the `CLAUDE.md` map are still loaded. The workflow agents (`worker`) also mitigate this by reading files before editing them, which reloads scoped rules.
+3. **Project-level only.** User-level `~/.claude/rules/` with `paths:` frontmatter were silently ignored (anthropics/claude-code#21858 — closed). Keep all kit rules at project level (`.claude/rules/` in the repo) — they should travel with the repo anyway.
+
+---
+
+## Repo layout (consumer repo after install + /fx-init)
+
+```
+your-project/
+├── CLAUDE.md                 ← bootstrap, REPO MAP (FENIX:MAP markers), navigation rule
+├── _claude_backup/           ← pre-install backup and upgrade archives — IGNORED by agents
+├── .fenix-manifest.json      ← install record, used by /fx-uninstall
+├── .claude/
+│   ├── commands/             ← /fx-* slash commands
+│   ├── agents/               ← architect, worker, tester (+ *-rules.md)
+│   └── rules/
+│       ├── git-workflow.md         ← always-on (no paths:)
+│       ├── fenix-conventions.md    ← always-on (no paths:)
+│       └── <module>.md             ← paths:-scoped, generated by /fx-init on approval
+├── docs/
+│   ├── info.md               ← authoritative project context (user-owned)
+│   └── DISCLAIMER.md         ← session bootstrap messages (editable)
+├── tasks/                    ← file-based dev workflow artifacts
+└── docs-meta/
+    ├── runbook.md            ← this file
+    └── templates/            ← workflow + rules templates
+```
+
+No `<module>/docs/` folders — by design. The map points into the code; agents read the code.
+
+---
+
+## The repo map
+
+- Lives between `<!-- FENIX:MAP:START -->` and `<!-- FENIX:MAP:END -->` in `CLAUDE.md`. `/fx-init` regenerates ONLY that span; everything outside the markers is user-owned.
+- Four sections: `Modules` (from the project manifest — `settings.gradle.kts` or equivalent, never a directory scan), `Entry points`, `Cross-cutting facts`, `When you need X, look here`.
+- Budget: ~120 map lines; whole `CLAUDE.md` under ~200 (the official guidance for CLAUDE.md size). If the map wants to grow past that, it's absorbing documentation — push detail back into code or a scoped rules file.
+- The map is a **hint, not truth**. Agents confirm map claims against the code they point to; on mismatch, code wins and the task notes "map stale — run /fx-init".
+- Refresh: re-run `/fx-init` after adding/removing modules or moving entry points. `/fx-task new` prints the hint at close when a task changed structure.
+
+---
+
+## Rules
+
+- `git-workflow.md` — commit/PR/branch conventions. Always-on. Edit the placeholders after install.
+- `fenix-conventions.md` — kit-wide agent behavior (verbatim code, manifest-driven discovery, minimum-diff edits, no module docs). Always-on.
+- `<module>.md` — per-module invariants with `paths:` globs. `/fx-init` suggests candidates and instantiates `docs-meta/templates/rules-module.md` only for the ones you approve. Existing rules files are never overwritten — they're yours.
+- Keep each scoped rules file under ~40 lines: invariants, not documentation.
+
+---
+
+## Dev workflow (unchanged core, v4 contracts)
+
+`/fx-task new <description> [briefs:<path>]`:
+
+1. **Task folder** — `tasks/<YYYYMMDD-HHMM-slug>/task.md`.
+2. **Navigation** — match the request against the in-context map; produce `map_sections`, `code_entry_points`, `module_scope`.
+3. **Architect** — writes `architect-plan.md` (verified facts vs assumptions, files to create/modify/delete, patterns with sources). Approval gate.
+4. **Worker** — executes the approved plan, live `worker-log.md`, only writer of project code.
+5. **Tester** — compares plan vs reality, `tester-review.md`, verdict.
+6. **Disposition** — human decides: close / re-dispatch / cancel. `outcome.md` written; map-refresh hint if structure changed.
+
+Every agent has an editable `<name>-rules.md`. `/fx-agent rules` lists them.
 
 ---
 
@@ -31,517 +118,57 @@ All three share the same three-phase shape: Discover/Audit → Plan → Execute.
 
 Three entry points, all converging on the same upgrade logic:
 
-- `/fx-init upgrade [version]` — from inside Claude Code. Reads the manifest, resolves the latest release tag (or accepts a pinned version), shows a plan, and invokes `install-online.sh` on approval. The simplest path on 3.1.0+ installs.
+- `/fx-init upgrade [version]` — from inside Claude Code. Reads the manifest, resolves the latest release tag (or accepts a pinned version), shows a plan, and invokes `install-online.sh` on approval.
 - `curl -fsSL …/install-online.sh | bash` — from a shell.
 - `./scripts/setup.sh` from a manually-extracted kit zip — equivalent.
 
 All three detect an existing install from `.fenix-manifest.json` and apply the matching `scripts/upgrades/<from>-to-<to>.json`.
 
-- **replace**: kit-owned files overwritten with the target version. Pre-change copy goes to `_claude_backup/<to>-upgrade/<path>` and is recorded as `upgrade-replace` in the manifest.
-- **preserve**: user content (`CLAUDE.md`, `docs/info.md`, `docs/task-router.md`, `docs/hint_index_map.md`) left untouched.
-- **create_if_missing**: new files added in the target version, installed only if absent.
+- **replace**: kit-owned files overwritten with the target version. Pre-change copy goes to `_claude_backup/<to>-upgrade/<path>` and is recorded as `upgrade-replace` in the manifest. **In 4.0.0 this includes `CLAUDE.md`** — the v4 map and navigation rules live there; copy your custom sections back from the backup, then run `/fx-init`.
+- **preserve**: user content (`docs/info.md`, `docs/DISCLAIMER.md`, `tasks/`) left untouched.
+- **create_if_missing**: new files added in the target version (e.g. `.claude/rules/*` in 4.0.0), installed only if absent.
 - **remove**: files dropped in the target version, moved to the same backup folder and recorded as `upgrade-remove`.
+- **sweep_manifest_patterns** (4.0.0): the installer walks the consumer repo's own manifest and moves every Fenix-recorded docs artifact (wings, rooms, drawers, `_pending/_history`, reference scaffolding) into the backup folder. Auditor-filled prose is human-approved content — archived, never hard-deleted. Hand-written `reference/` files aren't in the manifest and stay put; move anything still valuable into `.claude/rules/` or the map.
 
-If no upgrade JSON exists for the transition, the installer stops rather than silently merging. Downgrades are refused. `/fx-uninstall` removes Fenix entirely and does not revert upgrades — manually copy from `_claude_backup/<version>-upgrade/` if you need pre-upgrade content.
-
----
-
-## Topology (wings/rooms/drawers, decentralized)
-
-```
-modules/<name>/                  ← module owns its docs
-├── src/
-├── build.gradle.kts
-└── docs/
-    ├── README.md                ← wing root
-    ├── rooms/                   ← subsystem docs
-    └── drawers/                 ← single-concern leaves
-
-docs/                            ← thin shell at repo root
-├── hint_index_map.md            ← wayfinding, source of truth for structure
-├── info.md                      ← user-owned setup notes
-├── STYLE.md                     ← conventions
-├── _pending/                    ← audit reports awaiting approval
-└── _history/                    ← archived audit reports
-
-docs-meta/.fenix-cache.json      ← derived frontmatter index; the delta gate's input
-```
-
-**Module path prefix** is **not hardcoded**. Modules may live at `modules/<name>/`, repo root, or grouped (`shared/`, `composeApp/`, `iosApp/`). The runbook discovers actual paths from `settings.gradle.kts` `include(":...")` entries.
-
-**Convention:** any module with public surface MUST have at least `docs/README.md`. Internal-only utility modules can skip docs entirely.
-
----
-
-## Style — AI-optimized
-
-Docs are consumed by AI agents on tasks. Density and scannability over narrative prose.
-
-| Surface | Style |
-|---|---|
-| Overview | One line: `<Name> — <what>; <key components>` |
-| Components / Surface | Verbatim signatures only, no paraphrase |
-| Wiring | Bullets, one fact per line, cite `<file>:<line>` when non-obvious |
-| Gotchas | Bullets from `// TODO`, `// FIXME`, `// HACK`, `// NOTE:`, `// IMPORTANT:`, `@Deprecated`. Cite source. `(none)` if empty |
-| Section headers | Greppable English |
-| Cross-ref links | Standard markdown |
-
-No narrative paragraphs in wing READMEs, rooms, or drawers. No emojis. No drive-by rewrites. Minimum-diff edits.
-
-**File size — hard cap 70 lines** per wing README, room, or drawer (counting frontmatter and code blocks). Over cap → wing README becomes a thin index; per-component drawers absorb detail. See `templates/STYLE.md` for the full split policy.
-
----
-
-## Frontmatter on every room and drawer
-
-```yaml
----
-documents:
-  - <repo-relative path to source file 1>
-  - <repo-relative path to source file 2>
-last_reviewed_commit: <short SHA>
-last_reviewed_date: <YYYY-MM-DD>
----
-```
-
-**Freshness rule:** when any listed source file changes, the doc must be either updated or re-stamped with a new `last_reviewed_commit`. Re-stamping without prose changes is fine — it means "I read the diff, nothing to update." Leaving an old hash on a doc whose source has moved is staleness.
-
-**Re-stamp authority:** anyone touching the module can re-stamp. (Adjust if your team needs stricter rules.)
-
-**Freshness check command:** for each doc with frontmatter, run `git log <last_reviewed_commit>..HEAD -- <file>` for each listed source file. Non-empty output → doc is stale.
-
----
-
-## `/init` — bootstrap
-
-Trigger: user types `/init`. Use this when a repo has no wings/rooms/drawers structure, partial structure, or new modules without docs.
-
-### Phase 1 — Discover (read-only)
-
-1. Detect current state. Print:
-   ```
-   docs/                       [present | missing]
-   docs/hint_index_map.md      [present | missing]
-   docs/info.md                [present | missing]
-   docs/STYLE.md               [present | missing]
-   Per-module docs             N / M modules documented
-   ```
-2. Read `INFO_FILE` if present (authoritative context).
-3. Discover modules via `cat settings.gradle.kts | grep -E "^include"` — this is canonical. Don't directory-scan.
-4. For each module, spawn the **`module-discoverer`** subagent in parallel via `Task` with `subagent_type=module-discoverer`. Pass `{ module_name, module_path }`. The subagent handles dependency signal detection, public surface scanning, and source set detection. See `.claude/agents/module-discoverer.md` for its full contract.
-5. Main agent synthesizes structure plan from subagent returns.
-
-### Phase 2 — Plan
-
-Output structure plan as a single markdown document:
-
-```markdown
-## Proposed `/init` plan
-
-### Modules detected: N
-
-| Module | Path | Action | Rooms | Drawers suggested |
-|---|---|---|---|---|
-| core | shared/core/ | NEW WING | di, persistence | CoreModule |
-| practice | modules/practice/ | NEW WING | di, ui-android, ui-ios | PracticeModule |
-| utils | shared/utils/ | SKIP (internal only) | — | — |
-| auth | modules/auth/ | ALREADY HAS DOCS | — | — |
-
-### Files to create
-
-- docs/hint_index_map.md
-- docs/info.md (template)
-- docs/STYLE.md
-- shared/core/docs/README.md
-- shared/core/docs/rooms/di.md
-- shared/core/docs/rooms/persistence.md
-- modules/practice/docs/README.md
-- ...
-
-### Files NOT touched (already exist)
-
-- modules/auth/docs/README.md
-- ...
-```
-
-Stop. Wait for human approval. User can edit the plan inline before approving.
-
-### Phase 3 — Generate
-
-On approval:
-
-1. Create directories.
-2. For each file in the approved plan:
-   - Use the appropriate template from § Templates below.
-   - Fill frontmatter `documents:` with best-guess source files (public surface from Phase 1 discovery).
-   - Set `last_reviewed_commit` = `git rev-parse --short HEAD`.
-   - Set `last_reviewed_date` = today.
-3. Build `hint_index_map.md` from discovered structure with all wings indexed.
-4. Generate `info.md` ONLY if it doesn't exist. Use the template — title + summary blockquote + toolchain stub.
-5. Print summary:
-   ```
-   /init complete
-
-   Wings created: N
-   Rooms generated: M
-   Drawers suggested but NOT created: K (create as needed)
-   info.md: created template / left untouched
-   hint_index_map.md: created / updated with new wings only
-   ```
-
-### Non-destructive guarantees
-
-- `hint_index_map.md` exists → only add new wing entries. Never rewrite existing entries.
-- Wing README exists → never overwrite. Mark "already documented" in plan.
-- Rooms or drawers exist → never overwrite. Wing with README but no rooms → can offer to add rooms.
-- `info.md` exists → never touch. Even if empty.
-
-### Drawer policy
-
-`/init` does NOT auto-generate drawers. They're leaves and grow organically. Phase 2 SUGGESTS high-value drawers (DI entry points, persistence schemas, key public APIs). Creating them is the user's call after init completes.
-
----
-
-## `/info` — status check
-
-Trigger: user types `/info` or `info`.
-
-Read-only. Doesn't trigger an audit, doesn't load full docs.
-
-Output:
-
-```
-P-3 (Fenix) v3.2.0
-
-<summary line from docs/info.md if present>
-
-Topology:    wings/rooms/drawers decentralized (per-module docs/)
-Freshness:   enabled
-Index:       docs/hint_index_map.md
-Setup notes: docs/info.md
-Style guide: docs/STYLE.md
-Audit log:   docs/_history/
-
-Modules:     N total, M documented (M/N)
-Last audit:  <date from latest file in docs/_history/>
-```
-
-If repo is uninitialized:
-
-```
-P-3 (Fenix) v3.2.0
-
-⚠ Repo not initialized. Run /init to bootstrap wings/rooms/drawers structure.
-
-Detected:
-  docs/                 missing
-  hint_index_map.md     missing
-  info.md               missing
-  Per-module docs       0 / N modules
-```
-
-If partially initialized, show specifically what's missing.
-
-The summary line comes from the first blockquote in `info.md` (right under the H1 title).
-
----
-
-## Audit + update sweep — default flow
-
-This is what runs when you paste this runbook into Claude Code without a slash command.
-
-### Phase 1 — Audit (read-only, delta-gated)
-
-Engage plan mode (`shift+tab`). **No edits this phase** (except building the cache if absent).
-
-1. Read `INFO_FILE`. Note any conventions or environment quirks. They override inferences from code.
-2. Read `INDEX_FILE` end to end. Build mental map of every wing, room, drawer, xref.
-3. **Load or build the cache** `docs-meta/.fenix-cache.json` — a frontmatter index (`documents:`, `last_reviewed_commit`, `is_stub`) per doc. If absent or `--rebuild-cache`, build it inline: glob rooms/drawers/wing-READMEs, read frontmatter only + grep for stub markers. This is the only doc-touching work the orchestrator does. Manifest-record the file the first time it's created.
-4. **Per-doc delta gate.** For each cached doc, run `git log <doc.last_reviewed_commit>..HEAD --oneline -- <doc.documents:>` — the doc is **delta-stale** if that returns any commit (sources moved since *it* was last reviewed; gate per-doc, not a global `main..HEAD` range). A module is **in scope** if it owns a delta-stale doc OR a doc with `is_stub: true`. Escape hatches: `--all` (audit everything), `--only <module>`, `--rebuild-cache`, `--stubs-only` (gate on stubs, skip the staleness git-log).
-5. **Spawn an auditor only for in-scope modules.** For each, spawn the **`module-auditor`** subagent in parallel via `Task` with `subagent_type=module-auditor`. Pass `{ module_name, module_path, BASE_REF, HEAD_REF, stub_docs, stale_docs, suggest_drawers }`. The auditor reads only the handed docs and, for staleness, the `git diff <last_reviewed_commit>..HEAD -- <documents:>` — not the whole `src/`. Modules gated out get no auditor; report them "up to date (cache)." See `.claude/agents/module-auditor.md` for the subagent's contract.
-6. **Index integrity** is checked when synthesizing the report (xref breaks, orphan rooms/drawers). The per-doc staleness gate in step 4 already covers source-level freshness, so no separate scan runs here; for a standalone read-only staleness report use `/fx-doc freshness` (which spawns the cache-backed **`freshness-scanner`**). See `.claude/agents/freshness-scanner.md`.
-7. Each `module-auditor` invocation returns:
-   ```
-   ### Module: <name>
-   - Wing path: <module-path>/docs/
-   - Change summary: ...
-   - Rooms affected: [list]
-   - Drawers affected: [list]
-   - Drawers needed (new): [list with one-line justification]
-   - Xref breaks in hint_index_map: [list]
-   - Pre-existing rot found: [list, optional]
-   - Severity: trivial | rewrite | new-drawer-needed
-   ```
-8. Main agent synthesizes:
-   - **Top:** summary table (one row per module — name, severity, room count, drawer count, xref breaks).
-   - **Middle:** per-module detail blocks.
-   - **Stale-docs section:** docs the per-doc gate flagged delta-stale (sources moved since each doc's `last_reviewed_commit`), with the auditor's severity classification.
-   - **Bottom:** full `hint_index_map.md` change list (additions, removals, xref edits).
-9. Save report to `docs/_pending/audit-<YYYYMMDD-HHMM>.md`.
-10. Print: `Audit complete. <N> modules affected, <K> stale docs flagged. Review report at <path>. Reply 'approved' to proceed to Phase 3, or send corrections.`
-11. **Stop. Wait for human approval. Do not proceed until human types `approved` or `proceed`.**
-
-### Phase 2 — Plan (review with human)
-
-Trigger: human responds to audit. Possible responses:
-
-- `approved` — proceed to Phase 3 with audit as-is.
-- Edits to the audit report (e.g. "skip module X", "drawer Y not needed", "treat stale doc Z as re-stamp only").
-- Questions — answer, refine the audit, ask again.
-
-Output a finalized plan in `docs/_pending/plan-<YYYYMMDD-HHMM>.md` reflecting human edits. Get explicit approval before Phase 3.
-
-### Phase 3 — Update (execute, serial not parallel)
-
-1. `TodoWrite`: one todo per affected module + one per stale doc.
-2. Process **serially**. Parallel writes race on `hint_index_map.md`.
-3. For each module:
-   1. Apply edits to the affected rooms/drawers per the auditor proposal (built from the diff — you don't need to re-read the whole wing).
-   2. Code, types, errors verbatim.
-   3. Add new drawers if plan justified them. Use drawer template.
-   4. Update frontmatter: bump `last_reviewed_commit` to `git rev-parse --short HEAD`, `last_reviewed_date` to today.
-   5. Update `hint_index_map.md`: wing's section, plus any cross-wing xrefs.
-   6. Update the cache entry for each touched doc (`is_stub: false` after a fill; `last_reviewed_commit` to HEAD).
-   7. Mark todo done. Print one-line summary: `<module>: <what changed>`.
-4. For docs the gate flagged delta-stale that need no prose change (re-stamp candidates):
-   1. Read source diff since `last_reviewed_commit`.
-   2. If facts still accurate → re-stamp only (bump commit + date + cache).
-   3. If facts need update → edit, then re-stamp.
-5. After all done:
-   - Re-validate `hint_index_map.md`: every link resolves, every wing listed, no orphan rooms or drawers.
-   - Update `Last index review` hash.
-   - Refresh the cache's `head_commit` + `generated_at` to the post-update HEAD.
-   - Move audit + plan reports from `docs/_pending/` to `docs/_history/`.
-   - Print final summary table.
-
----
-
-## Templates
-
-These are the canonical shapes. `/init` uses them directly. Manual doc creation should follow them.
-
-### `docs/info.md` template
-
-```markdown
-# Setup info
-
-> <one-line summary of project — toolchain + platforms. /info echoes this line.>
-
-## Toolchain
-
-- Kotlin: <version>
-- Gradle: <version>
-- Xcode: <version>
-- AGP: <version>
-
-## Modules
-
-| Module | Purpose |
-|---|---|
-| <name> | <one-line purpose> |
-
-## Local conventions
-
-- <convention not captured in code>
-
-## Environment quirks
-
-- <quirk Claude Code should know about>
-```
-
-### `docs/hint_index_map.md` template
-
-```markdown
-# hint_index_map
-
-Palace wayfinding. Source of truth for documentation topology.
-
-Last index review: <short SHA>
-Last index date: <YYYY-MM-DD>
-
----
-
-## <module-name>
-
-Module path: `<path-from-settings.gradle>`
-Docs root: `<path>/docs/`
-
-Rooms:
-- di → `<path>/docs/rooms/di.md`
-- persistence → `<path>/docs/rooms/persistence.md`
-
-Drawers (notable):
-- `<ClassName>` → `<path>/docs/drawers/<ClassName>.md`
-
-Cross-wing:
-- depends on → <module-a>, <module-b>
-- consumed by → <module-c>
-
----
-
-## <next-module>
-...
-```
-
-### Wing README template (`<module>/docs/README.md`)
-
-```markdown
-# Wing: <module>
-
-<one-line summary>
-
-## Public surface
-
-- `<TypeName>` — <purpose>
-- `<TypeName>` — <purpose>
-
-## Rooms
-
-- [DI](rooms/di.md) — <one line>
-- [Persistence](rooms/persistence.md) — <one line>
-
-## Load order
-
-<ordering facts, e.g. "after CoreModule, before UiModule">
-
-## Cross-wing deps
-
-See `docs/hint_index_map.md` § <module>.
-```
-
-### Room template
-
-```markdown
----
-documents:
-  - <repo-relative source path>
-last_reviewed_commit: <short SHA>
-last_reviewed_date: <YYYY-MM-DD>
----
-
-# Room: <subsystem>
-
-## Overview
-
-<Name> — <what this subsystem does in this module>; <key components>.
-
-## Components
-
-\`\`\`kotlin
-<verbatim public API: signatures only, no implementation>
-\`\`\`
-
-## Wiring
-
-- <binding/registration fact>
-- <lifecycle or order fact>
-- <`<file>:<line>` for non-obvious wiring>
-
-## Gotchas
-
-- <fact from TODO/FIXME/HACK/NOTE/IMPORTANT/@Deprecated — cite `<file>:<line>`>
-- <or `(none)` if empty>
-
-## See also
-
-- [<related>](<relative-path>)
-```
-
-### Drawer template
-
-```markdown
----
-documents:
-  - <repo-relative source path>
-last_reviewed_commit: <short SHA>
-last_reviewed_date: <YYYY-MM-DD>
----
-
-# <DrawerName>
-
-<one-line: what it is, key role>
-
-## Surface
-
-\`\`\`kotlin
-<verbatim public API: signatures only>
-\`\`\`
-
-## Wiring
-
-- <where bound/registered/instantiated>
-- <`<file>:<line>` for non-obvious>
-
-## Depends on
-
-- <other drawer or room> — <why>
-
-## Used by
-
-- <wing/room/drawer> — <how>
-
-## Gotchas
-
-- <fact — cite `<file>:<line>`>
-- <or `(none)` if empty>
-
-## See also
-
-- [<related>](<relative-path>)
-```
+If no upgrade JSON exists for the transition, the installer stops rather than silently merging. 3.0.0/3.1.0 installs upgrade through the 3.2.0 kit first. Downgrades are refused. `/fx-uninstall` removes Fenix entirely and does not revert upgrades — manually copy from `_claude_backup/<version>-upgrade/` if you need pre-upgrade content.
 
 ---
 
 ## Constraints
 
-- `info.md` is authoritative. Conflicts with code-inferred behavior → `info.md` wins.
-- `hint_index_map.md` is source of truth for topology. Structural changes (rename wing, remove room class) → flag in audit. No silent restructure.
-- Diff ambiguous? Read source files. No invent behavior.
-- New drawer only if Plan phase justified it. No drive-by creation.
-- Pre-existing rot may be flagged by audit. Update may fix it if low-risk. High-risk rot → leave `<!-- TODO: ... -->`, surface in summary.
-- Preserve voice and structure of untouched sections. Minimum-diff edits.
+- `docs/info.md` is authoritative. Conflicts with code-inferred behavior → `info.md` wins.
 - Code, type signatures, error messages, gradle/koin/sqldelight/ktor config: verbatim. No paraphrasing of technical content.
+- Module discovery from the project manifest only. No directory scanning.
+- Minimum-diff edits everywhere; preserve voice and structure of untouched sections.
+- No `<module>/docs/` folders. Durable facts go to the map or a rules file.
 - No emojis. No marketing tone.
 
 ---
 
 ## Stop conditions
 
-Halt and ask human if:
+Halt and ask the human if:
 
-- Total diff exceeds ~3000 changed lines. Suggest splitting sweep into sub-batches.
-- Module has no existing wing AND audit says it now has public surface. New module → use `/init` for that module specifically.
-- `hint_index_map.md` not found at `INDEX_FILE` path. Suggest `/init`.
-- Wing references a room or drawer file that does not exist. Pre-existing breakage → human call.
-- Audit reveals > 5 pre-existing rot items. Suggests separate cleanup pass.
-- More than ~30 docs flagged delta-stale by the per-doc gate. Suggest a dedicated freshness sweep rather than folding all of them into one audit.
+- The repo map markers are missing or empty and the task needs navigation → run `/fx-init` first.
+- The map contradicts the code in a way that changes the task's scope → surface, suggest `/fx-init`, wait.
+- A task would require editing `CLAUDE.md`, `.claude/rules/`, or `docs/` from inside the dev workflow → that's the developer's call, outside the workflow.
 
 ---
 
 ## Output contract
 
-End of Phase 1 (Audit):
-- Path to audit report.
-- Summary table.
-- Explicit "approve to proceed" prompt.
+End of `/fx-init`:
+- Map status (refreshed in place / appended), module count, map line count.
+- Rules created vs kept.
+- `info.md` status (drafted / left untouched).
 
-End of Phase 3 (Update):
-- Summary table of changes per module.
-- List of new drawers added.
-- List of pre-existing rot items fixed.
-- List of pre-existing rot items deferred (with TODO refs).
-- List of stale docs re-stamped vs updated.
-- Path to archived audit + plan reports.
+End of `/fx-info`:
+- Status block as specified in `.claude/commands/fx-info.md`.
 
-End of `/init`:
-- Wings created count.
-- Rooms generated count.
-- Drawers suggested-but-not-created list.
-- `info.md` status (created / left untouched).
-
-End of `/info`:
-- Status block as specified above.
+End of `/fx-task new`:
+- Phase summary (architect / worker / tester / disposition) with artifact paths.
+- Map-refresh hint when the task changed repo structure.
 
 ---
 
-*Last updated for: 3.2.0*
+*Last updated for: 4.0.0*

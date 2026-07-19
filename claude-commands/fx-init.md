@@ -1,10 +1,10 @@
-# /fx-init — Bootstrap P-3 structure
+# /fx-init — Generate the repo map + scaffold rules
 
-Bootstrap wings/rooms/drawers documentation when missing or partial. Idempotent — safe to re-run. Forces per-module subagent dispatch (no inline shortcut).
+Bootstrap or refresh the P-3 v4 context system: the repo map inside `CLAUDE.md`, the `.claude/rules/` files, and `docs/info.md`. Idempotent — safe to re-run; a re-run refreshes the map and fills gaps, never overwrites user content.
 
 ## Modes
 
-- `/fx-init` — bootstrap (default). Scaffolds wings, drafts `info.md`, populates `CLAUDE.md`, generates `task-router.md`. Phases 0–4 below.
+- `/fx-init` — bootstrap or refresh (default). Phases 0–4 below.
 - `/fx-init upgrade [version]` — update the installed Fenix kit. Reads `.fenix-manifest.json`, queries GitHub for the latest release (or uses the pinned version), and runs `install-online.sh` to apply the upgrade JSON. See "Upgrade mode" at the end of this file.
 
 If the first argument is `upgrade`, jump straight to "Upgrade mode" and skip the bootstrap phases below.
@@ -14,24 +14,25 @@ If the first argument is `upgrade`, jump straight to "Upgrade mode" and skip the
 1. Verify `CLAUDE.md` exists at repo root. If missing, abort and tell the user to run `scripts/setup.sh` (from the unzipped `p3-fenix-<version>/` distribution) first.
 
 2. Check `CLAUDE.md`:
-   - Has placeholder sections (`<!-- Filled in by /fx-init` or empty `## Stack`, `## Project layout`, `## Local environment`) → flag for population in Phase 4.
-   - Fully populated → leave alone.
+   - Locate the `<!-- FENIX:MAP:START` / `<!-- FENIX:MAP:END -->` markers.
+     - Both present → map will be regenerated between them (refresh).
+     - Missing (hand-edited or pre-4.0.0 file) → flag: the whole `## Repo map` section (with markers) will be appended; nothing else in the file is touched.
+   - Has placeholder sections (`<!-- Filled in by /fx-init`, empty `## Stack` / `## Local environment`) → flag for population in Phase 4.
 
-3. Check `docs/info.md`:
+3. Check `.claude/rules/`:
+   - `git-workflow.md` / `fenix-conventions.md` missing → flag (they ship with setup.sh; recreate from `docs-meta/templates/` copies if absent).
+   - Note which per-module rules files already exist — existing ones are NEVER touched.
+
+4. Check `docs/info.md`:
    - Missing → flag for first-time draft in Phase 4.
    - Present and customized → leave alone.
    - Present but matches the template (still has `<one-line summary...>` placeholder) → flag for first-time draft.
 
-4. Check `reference/` folder:
-   - Missing → flag for creation in Phase 4.
-   - Present → list any `.md` files lacking frontmatter or not in `hint_index_map.md`. These will be linked during the next `/fx-doc update`, not during `/fx-init`. Note in Phase 1 status.
-
-5. Check `tasks/` folder:
-   - Missing → flag for creation in Phase 4.
+5. Check `tasks/` folder: missing → flag for creation in Phase 4.
 
 6. Check `.fenix-manifest.json`:
    - Missing → first-time install or pre-manifest install. Will be created in Phase 4 listing all files Fenix manages.
-   - Present → read it. Phase 4 will only update entries, not regenerate from scratch.
+   - Present → read it. Phase 4 will only append entries, not regenerate from scratch.
 
 ## Phase 1 — Discover
 
@@ -39,48 +40,44 @@ If the first argument is `upgrade`, jump straight to "Upgrade mode" and skip the
 
 2. Read `docs/info.md` if customized (authoritative context).
 
-3. Discover modules from `settings.gradle.kts` (or equivalent for non-Gradle projects). Run:
+3. Discover modules from `settings.gradle.kts` (or equivalent manifest for non-Gradle projects). Run:
    ```
    grep -E "^include" settings.gradle.kts
    ```
    This is canonical. Don't directory-scan.
 
-4. **Spawn `module-discoverer` per module via the Task tool.** Use `subagent_type=module-discoverer`. Pass `{ module_name, module_path }`. Each subagent inspects build dependencies, scans source for public surface, returns a structure proposal.
+4. **Spawn ONE repo-scan subagent via the Task tool** (`subagent_type=general-purpose`). Pass the module list and this instruction:
 
-   **HARD RULE:** This MUST be done via Task subagent dispatch. The main agent is forbidden from doing module discovery inline. If the main agent finds itself reading `build.gradle.kts` files directly during Phase 1, it has violated this rule — STOP, restart by dispatching subagents.
+   > For each module, inspect its build file and top-level source packages only — do NOT read implementation code. Return four markdown sections, total under 120 lines:
+   > `### Modules` — one line per module: name, path, one-phrase purpose.
+   > `### Entry points (where to start reading)` — subsystem → folder/file to open first (DI modules, DB schema, network clients, UI roots).
+   > `### Cross-cutting facts` — the few always-true facts: DI framework, DB, networking, threading rules, analytics/crash tooling. Facts, not prose.
+   > `### When you need X, look here` — 6–12 task-type → path lines covering the likely work areas.
 
-   Reasoning: inline discovery loses parallelism, pollutes the main agent's context with N modules of detail, and the discoverer's specialized rules don't apply. Subagent dispatch keeps the main agent's context clean for synthesis and ensures consistent discovery behavior.
+   **HARD RULE:** the scan runs in a subagent. If the main agent finds itself reading `build.gradle.kts` files during Phase 1, it has violated this rule — STOP, restart via subagent dispatch. Reasoning: the scan pollutes the main context with N modules of detail; only the distilled map should come back.
 
-5. Synthesize structure plan from subagent returns:
-
-   | Module | Path | Action | Rooms | Drawers suggested |
-
-   Action values: `NEW WING`, `SKIP (internal only)`, `ALREADY HAS DOCS`, `PARTIAL (add rooms)`.
+5. Sanity-check the returned map: every module from step 3 appears; no invented paths (spot-check 2–3 with `ls`); under ~120 lines.
 
 ## Phase 2 — Plan
 
 Output the plan. Stop. Wait for human approval.
 
 Include:
-- Wing/room structure (from Phase 1).
+- The generated map content (full text — it's short).
+- Whether markers exist (refresh in place) or the section will be appended.
+- Suggested per-module rules files (only for modules with real invariants worth stating — suggest, don't spam). Existing rules files listed as "kept as-is".
 - Whether `docs/info.md` will be drafted.
-- Whether `CLAUDE.md` placeholders will be populated.
-- Whether `docs/task-router.md` will be generated.
-- Whether `reference/`, `tasks/` folders will be created.
+- Whether `CLAUDE.md` placeholders (`Stack`, `Local environment`) will be populated.
+- Whether `tasks/` will be created.
 
-## Phase 3 — Generate wings
+## Phase 3 — Write the map + rules
 
-For each file in approved plan:
+On approval:
 
-1. Use templates from `docs-meta/templates/`.
-2. Frontmatter `documents:` initially empty `[]` or pointing at the module folder. **Real source-file lists are filled later by `module-auditor` during the first `/fx-doc audit`.** Wings are scaffolded with stubs intentionally — fills happen incrementally.
-3. `last_reviewed_commit` = `git rev-parse --short HEAD`.
-4. `last_reviewed_date` = today.
-5. Add to manifest: `{action: "create", path: <path>, phase: "init"}`.
-
-Build `docs/hint_index_map.md` from discovered structure.
-
-**IMPORTANT:** Generated rooms WILL contain template placeholders (`<2-4 sentences on...>`, etc.). This is by design. The `module-auditor` is responsible for filling them on the next `/fx-doc audit` or task-close audit. Do NOT attempt to fill them inline during init — that's the auditor's job.
+1. **Map:** replace everything between `FENIX:MAP:START` and `FENIX:MAP:END` in `CLAUDE.md` with the approved content. If markers are missing, append the full `## Repo map — ALWAYS navigate from here` section (markers included) at the end of `CLAUDE.md`. Never touch content outside the markers.
+   Manifest entry: `{action: "modify", path: "CLAUDE.md", phase: "init", changes: "repo map refresh"}`.
+2. **Always-on rules:** if `git-workflow.md` or `fenix-conventions.md` is missing from `.claude/rules/`, copy it from `docs-meta/templates/rules-*.md`. Manifest entry per created file. Never overwrite existing ones.
+3. **Per-module rules:** for each APPROVED suggestion, instantiate `docs-meta/templates/rules-module.md` as `.claude/rules/<module-name>.md` with real `paths:` globs and 3–5 real invariants (from the scan). Manifest entry per file. Skip modules the developer rejected.
 
 ## Phase 4 — Generate top-level files
 
@@ -96,32 +93,11 @@ If flagged in Phase 0:
 
 If flagged:
 1. Populate `## Stack` from discovered toolchain.
-2. Populate `## Project layout` from `settings.gradle.kts` modules.
-3. Populate `## Local environment` with sensible defaults.
-4. Show the diff. Apply edits if requested. Save.
-5. Manifest entry: `{action: "modify", path: "CLAUDE.md", phase: "init", changes: "populated placeholders"}`.
+2. Populate `## Local environment` with sensible defaults.
+3. Show the diff. Apply edits if requested. Save.
+4. Manifest entry: `{action: "modify", path: "CLAUDE.md", phase: "init", changes: "populated placeholders"}`.
 
-DO NOT replace bootstrap protocol, task routing rule, slash commands list, or subagents list.
-
-### `docs/task-router.md`
-
-ALWAYS generate or refresh.
-
-1. Walk every `<wing>/rooms/*.md`.
-2. Collect unique room names. Build category sections per name.
-3. Description hints from standard templates (di, persistence, etc.). Custom names → generic description.
-4. Preserve `## Custom categories` section.
-5. Update timestamps.
-6. Manifest entry.
-
-### `reference/` folder
-
-If flagged:
-1. Create `reference/`.
-2. Create `reference/README.md` with index pointer.
-3. Manifest entry.
-
-DO NOT auto-link existing reference files. That's `/fx-doc update`'s job.
+DO NOT replace the bootstrap protocol, task navigation rule, slash commands list, or subagents list.
 
 ### `tasks/` folder
 
@@ -137,14 +113,14 @@ If missing, create it. Otherwise, append entries from this run.
 Format:
 ```json
 {
-  "fenix_version": "3.2.0",
+  "fenix_version": "4.0.0",
   "installed_at": "<timestamp>",
   "actions": [
     {"action": "create", "path": "CLAUDE.md", "phase": "install"},
     {"action": "backup-move", "path": "CLAUDE.md", "to": "_claude_backup/CLAUDE.md", "phase": "install"},
-    {"action": "backup-move", "path": ".claude",   "to": "_claude_backup/.claude",   "phase": "install"},
-    {"action": "create", "path": "docs/info.md", "phase": "init", "timestamp": "..."},
-    {"action": "create", "path": "modules/foo/docs/", "phase": "init", "timestamp": "..."},
+    {"action": "create", "path": ".claude/rules/git-workflow.md", "phase": "install"},
+    {"action": "modify", "path": "CLAUDE.md", "phase": "init", "changes": "repo map refresh", "timestamp": "..."},
+    {"action": "create", "path": ".claude/rules/shared-core.md", "phase": "init", "timestamp": "..."},
     ...
   ]
 }
@@ -152,41 +128,34 @@ Format:
 
 ## Non-destructive guarantees
 
-- `hint_index_map.md` exists → only add new wing entries.
-- Wing README exists → never overwrite.
-- Rooms or drawers exist → never overwrite.
+- Map regeneration touches ONLY the text between `FENIX:MAP:START` and `FENIX:MAP:END`.
+- Content outside the markers is user-owned — never rewritten (placeholder fills excepted).
+- Existing `.claude/rules/*.md` files are never overwritten or deleted.
 - `info.md` customized → never touch.
-- `CLAUDE.md` populated → only fill remaining placeholders.
-- `task-router.md` Custom categories preserved.
 - `tasks/` content untouched on re-run.
 - Manifest never deletes entries; only appends.
 
-## Drawer policy
+## Rules policy
 
-DO NOT auto-generate drawers. `module-discoverer` SUGGESTS them in Phase 2; create only if developer approves.
+DO NOT auto-generate a rules file per module. Suggest candidates in Phase 2; create only what the developer approves. A rules file with nothing real to say is context noise.
 
 ## Final output
 
 ```
 /fx-init complete
 
-Wings created: N
-Rooms generated: M (with stubs — auditor will fill on first /fx-doc audit)
-Drawers suggested but NOT created: K
+Repo map: refreshed in place / appended (markers were missing) — <N> modules, <M> map lines
+Always-on rules: git-workflow.md, fenix-conventions.md — present / created
+Per-module rules created: <list or "none">   (existing files kept as-is: <list>)
 
 CLAUDE.md placeholders populated: yes/no
 info.md: drafted / left untouched
-hint_index_map.md: created / new wings added only
-task-router.md: <category-count> categories generated
-reference/: created / already present
 tasks/: created / already present
 Manifest: .fenix-manifest.json (<entry-count> entries total)
 
-⚠ Generated rooms contain template placeholders. Run /fx-doc audit to have
-the auditor read source and fill them with real content. The audit phase
-proposes content for review; nothing is written without approval.
-
-Next: review generated structure, then run /fx-doc audit to start filling stubs.
+Next: skim the map section in CLAUDE.md and the generated rules — edit freely,
+/fx-init never overwrites your edits. Re-run /fx-init after big structure
+changes to refresh the map.
 ```
 
 ---
@@ -206,7 +175,7 @@ Reached only when the first argument is `upgrade`. Updates the installed Fenix k
 
 2. Extract `installed_version` from the manifest's `fenix_version` field.
 
-3. If a target version was passed (`/fx-init upgrade 3.2.0`), use it as `target_version`. Otherwise resolve the latest release tag:
+3. If a target version was passed (`/fx-init upgrade 4.0.0`), use it as `target_version`. Otherwise resolve the latest release tag:
    ```bash
    curl -fsSL https://api.github.com/repos/ablack13/p-3-fenix/releases/latest \
      | python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name','').lstrip('v'))"
@@ -220,7 +189,7 @@ Reached only when the first argument is `upgrade`. Updates the installed Fenix k
 
 5. Check for uncommitted changes in Fenix-managed paths:
    ```bash
-   git status --porcelain -- .claude/ docs-meta/ docs/STYLE.md "P-3 (Fenix)- READ BEFORE FIRST.md" 2>/dev/null
+   git status --porcelain -- .claude/ docs-meta/ CLAUDE.md "P-3 (Fenix)- READ BEFORE FIRST.md" 2>/dev/null
    ```
    If output is non-empty, surface it and ask the developer to either commit, stash, or explicitly confirm before continuing — `upgrade-replace` will back up the current copies but overwriting uncommitted work is irreversible without `git stash`.
 
@@ -235,8 +204,9 @@ Current: <installed_version>
 Target:  <target_version>
 
 Strategy:
-  - Replace kit-owned files (agent rules, slash commands, runbook, doc templates).
-  - Preserve user content (CLAUDE.md, docs/info.md, docs/task-router.md, docs/hint_index_map.md).
+  - Replace kit-owned files (agent definitions, slash commands, runbook, workflow templates).
+  - Preserve user content (CLAUDE.md outside managed markers, docs/info.md,
+    your edits to .claude/rules/ — see the upgrade JSON for exceptions).
   - Create new files added in <target_version> (if any).
   - Pre-change copies → _claude_backup/<target_version>-upgrade/
 
@@ -280,16 +250,20 @@ Backups: _claude_backup/<target_version>-upgrade/
   - Diff against your current files if you customized any agent rules.
 
 Recommended follow-ups:
-  1. Review docs/STYLE.md, docs-meta/runbook.md, and any *-rules.md files you had customized.
+  1. Review docs-meta/runbook.md and any *-rules.md files you had customized.
      Diff against _claude_backup/<target_version>-upgrade/ to see what was overwritten.
-  2. If CLAUDE.md is preserved, manually sync any wanted changes from the new template
-     (visible at https://github.com/ablack13/p-3-fenix/blob/main/templates/CLAUDE.md).
-  3. Run /clear to drop the old context. The next session will load the upgraded
+  2. If the upgrade replaced CLAUDE.md (the 4.0.0 upgrade does), copy your custom
+     sections back from _claude_backup/<target_version>-upgrade/CLAUDE.md, then run
+     /fx-init to generate the repo map. If it was preserved, sync wanted changes from
+     the new template.
+  3. Check the version line in docs/DISCLAIMER.md — it is user-owned, upgrades never
+     touch it, so its banner may still name the old version.
+  4. Run /clear to drop the old context. The next session will load the upgraded
      commands and agents.
 ```
 
 ### Notes
 
 - The upgrade overwrites `.claude/commands/fx-init.md` itself during execution. The in-flight invocation is unaffected (its instructions are already in context), but subsequent `/fx-init upgrade` calls will use the new version's behavior.
-- If the kit ships no `scripts/upgrades/<installed>-to-<target>.json`, the installer fails fast rather than silently merging. Multi-step upgrades (e.g. 3.1.0 → 3.3.0) require the kit author to chain transitions in `install-online.sh` or to ship a direct upgrade JSON.
+- If the kit ships no `scripts/upgrades/<installed>-to-<target>.json`, the installer fails fast rather than silently merging. Multi-step upgrades (e.g. 3.1.0 → 4.0.0) require upgrading through an intermediate kit first, unless a direct upgrade JSON is shipped.
 - `/fx-uninstall` removes Fenix entirely after an upgrade — it does not revert to the previous version. Manually copy from `_claude_backup/<version>-upgrade/` if you need pre-upgrade content.

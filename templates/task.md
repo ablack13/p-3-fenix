@@ -15,25 +15,23 @@ phase: created | architect | worker | tester | disposition | closed
 
 <paths to external context, if any — e.g., `2105/`, `briefs/PM-1234/`>
 
-## Routing
+## Navigation
 
 <filled in during Phase 1 by /fx-task new>
 
-- Categories matched: <list>
-- Wing scope: <list>
-- Rooms loaded: <list>
-- Reference docs: <list>
+- Map sections matched: <list of matched map lines>
+- Module scope: <list>
+- Code entry points: <paths>
 
 ## Phase status
 
 | Phase | State | Started | Completed | Artifact |
 |---|---|---|---|---|
-| Routing | pending | — | — | — |
+| Navigation | pending | — | — | — |
 | Architect | pending | — | — | architect-plan.md |
 | Worker | pending | — | — | worker-log.md |
 | Tester | pending | — | — | tester-review.md |
 | Disposition | pending | — | — | outcome.md |
-| Doc audit | pending | — | — | doc-audit.md (optional) |
 
 ## Notes
 
