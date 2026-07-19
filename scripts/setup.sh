@@ -132,7 +132,7 @@ else
 fi
 
 if [[ ! -d "$REPO_ROOT/.git" ]] && ! git rev-parse --git-dir >/dev/null 2>&1; then
-  warn "Not inside a git repo. Continuing anyway, but you'll want one for freshness checks."
+  warn "Not inside a git repo. Continuing anyway, but /fx-uninstall's user-edit detection needs git history."
 else
   ok "Git repo detected"
 fi
@@ -416,11 +416,8 @@ for dir in \
   "$REPO_ROOT/.claude/commands" \
   "$REPO_ROOT/.claude/agents" \
   "$REPO_ROOT/docs" \
-  "$REPO_ROOT/docs/_pending" \
-  "$REPO_ROOT/docs/_history" \
   "$REPO_ROOT/docs-meta" \
   "$REPO_ROOT/docs-meta/templates" \
-  "$REPO_ROOT/reference" \
   "$REPO_ROOT/tasks"
 do
   if [[ -d "$dir" ]]; then
@@ -439,7 +436,6 @@ section "Installing slash commands"
 
 copy_if_missing "$KIT_DIR/claude-commands/fx-init.md"      "$REPO_ROOT/.claude/commands/fx-init.md"
 copy_if_missing "$KIT_DIR/claude-commands/fx-info.md"      "$REPO_ROOT/.claude/commands/fx-info.md"
-copy_if_missing "$KIT_DIR/claude-commands/fx-doc.md"       "$REPO_ROOT/.claude/commands/fx-doc.md"
 copy_if_missing "$KIT_DIR/claude-commands/fx-task.md"      "$REPO_ROOT/.claude/commands/fx-task.md"
 copy_if_missing "$KIT_DIR/claude-commands/fx-agent.md"     "$REPO_ROOT/.claude/commands/fx-agent.md"
 copy_if_missing "$KIT_DIR/claude-commands/fx-uninstall.md" "$REPO_ROOT/.claude/commands/fx-uninstall.md"
@@ -447,15 +443,6 @@ copy_if_missing "$KIT_DIR/claude-commands/fx-uninstall.md" "$REPO_ROOT/.claude/c
 # --- agents and rules ------------------------------------------------------
 
 section "Installing agents and rules"
-
-# Doc maintenance agents
-copy_if_missing "$KIT_DIR/claude-agents/module-auditor.md"          "$REPO_ROOT/.claude/agents/module-auditor.md"
-copy_if_missing "$KIT_DIR/claude-agents/module-auditor-rules.md"    "$REPO_ROOT/.claude/agents/module-auditor-rules.md"
-copy_if_missing "$KIT_DIR/claude-agents/module-discoverer.md"       "$REPO_ROOT/.claude/agents/module-discoverer.md"
-copy_if_missing "$KIT_DIR/claude-agents/module-discoverer-rules.md" "$REPO_ROOT/.claude/agents/module-discoverer-rules.md"
-copy_if_missing "$KIT_DIR/claude-agents/freshness-scanner.md"       "$REPO_ROOT/.claude/agents/freshness-scanner.md"
-copy_if_missing "$KIT_DIR/claude-agents/freshness-scanner-rules.md" "$REPO_ROOT/.claude/agents/freshness-scanner-rules.md"
-copy_if_missing "$KIT_DIR/claude-agents/_topology.md"               "$REPO_ROOT/.claude/agents/_topology.md"
 
 # Dev-team agents
 copy_if_missing "$KIT_DIR/claude-agents/architect.md"               "$REPO_ROOT/.claude/agents/architect.md"
@@ -465,16 +452,10 @@ copy_if_missing "$KIT_DIR/claude-agents/worker-rules.md"            "$REPO_ROOT/
 copy_if_missing "$KIT_DIR/claude-agents/tester.md"                  "$REPO_ROOT/.claude/agents/tester.md"
 copy_if_missing "$KIT_DIR/claude-agents/tester-rules.md"            "$REPO_ROOT/.claude/agents/tester-rules.md"
 
-# Reference linker
-copy_if_missing "$KIT_DIR/claude-agents/reference-linker.md"        "$REPO_ROOT/.claude/agents/reference-linker.md"
-copy_if_missing "$KIT_DIR/claude-agents/reference-linker-rules.md"  "$REPO_ROOT/.claude/agents/reference-linker-rules.md"
-
 # --- docs/ shared files ----------------------------------------------------
 
 section "Installing shared docs"
 
-copy_if_missing "$KIT_DIR/templates/STYLE.md"        "$REPO_ROOT/docs/STYLE.md"
-copy_if_missing "$KIT_DIR/templates/task-router.md"  "$REPO_ROOT/docs/task-router.md"
 copy_if_missing "$KIT_DIR/templates/info.md"         "$REPO_ROOT/docs/info.md"
 copy_if_missing "$KIT_DIR/templates/DISCLAIMER.md"   "$REPO_ROOT/docs/DISCLAIMER.md"
 
@@ -501,30 +482,6 @@ fi
 
 copy_if_missing "$KIT_DIR/P-3 (Fenix)- READ BEFORE FIRST.md" "$REPO_ROOT/P-3 (Fenix)- READ BEFORE FIRST.md"
 
-# --- reference/ scaffolding ------------------------------------------------
-
-section "Installing reference/ scaffolding"
-
-REF_README="$REPO_ROOT/reference/README.md"
-if [[ -e "$REF_README" ]]; then
-  skip "$REF_README"
-else
-  cat > "$REF_README" <<'REFEOF'
-# Reference docs
-
-Cross-cutting documentation that applies to multiple wings or the project as a whole.
-
-Drop a `.md` file here (or in a subfolder like `reference/decisions/`).
-On the next `/fx-doc update`, the `reference-linker` subagent will propose
-frontmatter and index entries for unlinked files. Approve, edit, or reject
-the proposal during the update's plan phase.
-
-File template: see `docs-meta/templates/reference.md`.
-REFEOF
-  ok "$REF_README"
-  manifest_append "create" "reference/README.md"
-fi
-
 # --- tasks/ scaffolding ----------------------------------------------------
 
 section "Installing tasks/ scaffolding"
@@ -543,17 +500,11 @@ fi
 section "Installing reference material (docs-meta/)"
 
 copy_if_missing "$KIT_DIR/runbook.md"                     "$REPO_ROOT/docs-meta/runbook.md"
-copy_if_missing "$KIT_DIR/templates/hint_index_map.md"    "$REPO_ROOT/docs-meta/templates/hint_index_map.md"
-copy_if_missing "$KIT_DIR/templates/wing-README.md"       "$REPO_ROOT/docs-meta/templates/wing-README.md"
-copy_if_missing "$KIT_DIR/templates/room.md"              "$REPO_ROOT/docs-meta/templates/room.md"
-copy_if_missing "$KIT_DIR/templates/drawer.md"            "$REPO_ROOT/docs-meta/templates/drawer.md"
-copy_if_missing "$KIT_DIR/templates/reference.md"         "$REPO_ROOT/docs-meta/templates/reference.md"
 copy_if_missing "$KIT_DIR/templates/task.md"              "$REPO_ROOT/docs-meta/templates/task.md"
 copy_if_missing "$KIT_DIR/templates/architect-plan.md"    "$REPO_ROOT/docs-meta/templates/architect-plan.md"
 copy_if_missing "$KIT_DIR/templates/worker-log.md"        "$REPO_ROOT/docs-meta/templates/worker-log.md"
 copy_if_missing "$KIT_DIR/templates/tester-review.md"     "$REPO_ROOT/docs-meta/templates/tester-review.md"
 copy_if_missing "$KIT_DIR/templates/outcome.md"           "$REPO_ROOT/docs-meta/templates/outcome.md"
-copy_if_missing "$KIT_DIR/templates/doc-audit.md"         "$REPO_ROOT/docs-meta/templates/doc-audit.md"
 
 # --- summary ---------------------------------------------------------------
 
@@ -570,20 +521,15 @@ Read first:
 
 Next steps:
   1. Open Claude Code in this repo.
-  2. Run ${BOLD}/fx-init${RESET}. It scaffolds wings (with stubs intentionally),
-     drafts info.md, populates CLAUDE.md, generates task-router.md.
-  3. Run ${BOLD}/fx-doc audit${RESET} (then update). The auditor reads source code
-     and fills the stubs with real content for your review.
-  4. Run ${BOLD}/fx-info${RESET} anytime to confirm status.
+  2. Run ${BOLD}/fx-init${RESET}. It generates the repo map inside CLAUDE.md,
+     drafts info.md, and scaffolds .claude/rules/.
+  3. Run ${BOLD}/fx-info${RESET} anytime to confirm status.
 
 Day-to-day commands:
   ${BOLD}/fx-task <description>${RESET}        Explicit routing — see classification.
   ${BOLD}/fx-task new <description>${RESET}    Dev workflow (architect → worker → tester),
                                 file-based artifacts in ${DIM}tasks/<task_id>/${RESET}.
                                 Add ${DIM}briefs:<path>${RESET} for external context.
-  ${BOLD}/fx-doc audit${RESET}                  Phase 1 audit — detects stubs + staleness.
-  ${BOLD}/fx-doc update${RESET}                 Full sweep — fills stubs after approval.
-  ${BOLD}/fx-doc freshness${RESET}              Global staleness check.
   ${BOLD}/fx-agent rules${RESET}                List agent rules files for editing.
   ${BOLD}/fx-uninstall${RESET}                  Remove all Fenix files (manifest-driven).
 
@@ -607,10 +553,6 @@ cat <<EOF
 Manifest:
   ${DIM}.fenix-manifest.json${RESET} tracks every file Fenix created.
   Keep it committed for /fx-uninstall to work later.
-
-Optional cleanup:
-  - .gitignore ${DIM}docs/_pending/${RESET} to keep audit drafts out of git.
-  - .gitignore ${DIM}docs-meta/.fenix-cache.json${RESET} — derived /fx-doc cache, rebuilt on demand.
 EOF
 
 # Detect distribution artifacts inside the repo root and print a copy-paste
@@ -625,6 +567,8 @@ fi
 
 if (( ${#CLEANUP_TARGETS[@]} > 0 )); then
 cat <<EOF
+
+Optional cleanup:
   - Delete the distribution artifacts now that install is done:
       ${BOLD}rm -rf ${CLEANUP_TARGETS[*]}${RESET}
 EOF
